@@ -1,0 +1,12 @@
+- Prefer simplicity in design and implementation.
+- Use only the tech stack currently adopted in the project.
+  - Vike
+  - React
+  - TypeScript
+  - Zustand for UI state mgmt
+  - XState for game state
+  - Tailwind
+  - Daisy UI
+- Favor small files and components for maintainability.
+- Small files are easier to read, test, and refactor, so also add tests :)
+- Prefer placing tests near the code they are testing, not in a separate directory. e.g. for components/foo.tsx, the test file would be components/foo.test.tsx
