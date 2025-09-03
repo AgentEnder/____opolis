@@ -1,10 +1,22 @@
 import { Card, CellData, CellType, RoadSegment } from './game';
+import { ScoringCondition } from './scoring';
+import { CustomScoringCondition } from './scoring-formulas';
+import { CustomMetadata, MetadataSchema } from './metadataSystem';
+
+export interface ZoneType {
+  id: string;
+  name: string;
+  color: string;
+  description?: string;
+}
 
 export interface CardDefinition {
   id: string;
   name?: string;
   cells: CellData[][];
   count: number; // How many of this card are in the deck
+  scoringConditionId?: string; // References a scoring condition in the deck
+  customMetadata?: CustomMetadata;
 }
 
 export interface Expansion {
@@ -20,9 +32,25 @@ export interface GameVariation {
   description: string;
   baseCards: CardDefinition[];
   expansions: Expansion[];
+  zoneTypes: ZoneType[];
   theme: {
     primaryColor: string;
     secondaryColor: string;
+  };
+  type?: 'preset' | 'custom';
+  isCustom?: boolean;
+}
+
+export interface CustomDeck extends GameVariation {
+  type: 'custom';
+  isCustom: true;
+  customScoringConditions: CustomScoringCondition[]; // All custom scoring conditions in this deck
+  metadataSchema?: MetadataSchema; // Schema for custom card metadata
+  metadata: {
+    author: string;
+    created: Date;
+    modified: Date;
+    version: string;
   };
 }
 
@@ -46,6 +74,14 @@ const SPRAWOPOLIS: GameVariation = {
   id: 'sprawopolis',
   name: 'Sprawopolis',
   description: 'The original urban planning card game',
+  type: 'preset',
+  isCustom: false,
+  zoneTypes: [
+    { id: 'residential', name: 'Residential', color: '#60a5fa', description: 'Housing areas' },
+    { id: 'commercial', name: 'Commercial', color: '#f59e0b', description: 'Business districts' },
+    { id: 'industrial', name: 'Industrial', color: '#6b7280', description: 'Manufacturing zones' },
+    { id: 'park', name: 'Park', color: '#34d399', description: 'Green spaces' },
+  ],
   theme: {
     primaryColor: '#3b82f6',
     secondaryColor: '#1e40af'
@@ -163,6 +199,14 @@ const AGROPOLIS: GameVariation = {
   id: 'agropolis',
   name: 'Agropolis',
   description: 'Rural farming and countryside development',
+  type: 'preset',
+  isCustom: false,
+  zoneTypes: [
+    { id: 'fields', name: 'Fields', color: '#84cc16', description: 'Farmland and crops' },
+    { id: 'livestock', name: 'Livestock', color: '#a78bfa', description: 'Animal farming' },
+    { id: 'orchards', name: 'Orchards', color: '#34d399', description: 'Fruit trees' },
+    { id: 'buildings', name: 'Buildings', color: '#f59e0b', description: 'Farm buildings' },
+  ],
   theme: {
     primaryColor: '#22c55e',
     secondaryColor: '#15803d'
@@ -213,6 +257,14 @@ const CASINOPOLIS: GameVariation = {
   id: 'casinopolis', 
   name: 'Casinopolis',
   description: 'Glitzy casino and entertainment district',
+  type: 'preset',
+  isCustom: false,
+  zoneTypes: [
+    { id: 'casino', name: 'Casino', color: '#dc2626', description: 'Gaming floors' },
+    { id: 'hotel', name: 'Hotel', color: '#7c3aed', description: 'Accommodation' },
+    { id: 'entertainment', name: 'Entertainment', color: '#06b6d4', description: 'Shows and venues' },
+    { id: 'dining', name: 'Dining', color: '#f59e0b', description: 'Restaurants and bars' },
+  ],
   theme: {
     primaryColor: '#f59e0b',
     secondaryColor: '#d97706'
