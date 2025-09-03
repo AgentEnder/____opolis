@@ -1,16 +1,37 @@
 import React, { useRef, useEffect, useCallback } from "react";
 import { GameState, Card } from "../types/game";
 import { useUIStore } from "../stores/uiStore";
-import { useSharedGameMachine } from "../providers/GameMachineProvider";
+import { GameMachineContextValue } from "../providers/GameMachineProvider";
+import { RuleTestMachineContextType } from "../providers/RuleTestMachineProvider";
 
 interface GameBoardProps {
   gameState: GameState;
   onCardPlace?: (x: number, y: number) => void;
+  // Machine context that provides selectors and actions
+  machine: GameMachineContextValue | RuleTestMachineContextType;
+  // Optional size constraints for embedded usage
+  width?: number;
+  height?: number;
+  containerRef?: React.RefObject<HTMLElement>;
 }
 
-export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
+export default function GameBoard({
+  gameState,
+  onCardPlace,
+  machine,
+  width,
+  height,
+  containerRef,
+}: GameBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mouseGridPos, setMouseGridPos] = React.useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
+  // State for card placement dragging
+  const [isCardDragging, setIsCardDragging] = React.useState(false);
+  const [cardDragStart, setCardDragStart] = React.useState<{
     x: number;
     y: number;
   } | null>(null);
@@ -22,12 +43,14 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
     setDragging,
     setTransform,
     isPlacing,
+    highlightedTiles,
   } = useUIStore();
 
-  // Get selected card from game machine
-  const { selectors: gameSelectors, actions } = useSharedGameMachine();
-  const selectedCard = gameSelectors.selectedCard;
-  const cardRotation = gameSelectors.cardRotation;
+  // Get state and actions from the passed machine context
+  const selectedCard = machine.selectors.selectedCard;
+  const cardRotation = machine.selectors.cardRotation || 0;
+  const selectedVariations = machine.selectors.selectedVariations || [];
+  const actions = machine.actions;
 
   // Simple validation function - check if position overlaps with existing cards
   const isValidPlacementPosition = (gridX: number, gridY: number): boolean => {
@@ -51,6 +74,18 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
   const CARD_WIDTH = 2; // 2 tiles wide
   const CARD_HEIGHT = 2; // 2 tiles tall
 
+  // Get canvas dimensions - use provided dimensions or container/window
+  const getCanvasDimensions = useCallback(() => {
+    if (width && height) {
+      return { width, height };
+    }
+    if (containerRef?.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }
+    return { width: window.innerWidth, height: window.innerHeight };
+  }, [width, height, containerRef]);
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -58,9 +93,10 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas size to full viewport
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    // Set canvas size based on props or container
+    const dimensions = getCanvasDimensions();
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -78,11 +114,16 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
     // Draw grid
     drawGrid(ctx);
 
-    // Draw placed cards
+    // Draw tiles using tile map approach for better performance (two-pass rendering)
     if (gameState.board) {
-      gameState.board.forEach((card) => {
-        drawCard(ctx, card);
-      });
+      drawTileMap(ctx, gameState.board);
+      // Second pass: draw all roads on top
+      drawRoadMap(ctx, gameState.board);
+    }
+
+    // Draw dimmed tiles for scoring visualization
+    if (highlightedTiles && highlightedTiles.length > 0) {
+      drawDimmedTiles(ctx, highlightedTiles);
     }
 
     // Draw placement preview
@@ -97,7 +138,15 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
     }
 
     ctx.restore();
-  }, [gameState.board, transform, selectedCard, mouseGridPos, cardRotation]);
+  }, [
+    gameState.board,
+    transform,
+    selectedCard,
+    mouseGridPos,
+    cardRotation,
+    highlightedTiles,
+    getCanvasDimensions,
+  ]);
 
   useEffect(() => {
     draw();
@@ -116,9 +165,15 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
   // Handle keyboard input for card rotation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "r" && selectedCard) {
+      if (
+        e.key.toLowerCase() === "r" &&
+        selectedCard &&
+        !e.metaKey &&
+        !e.altKey &&
+        !e.ctrlKey
+      ) {
         e.preventDefault();
-        actions.rotateCard();
+        actions?.rotateCard();
         console.log("Card rotated");
       }
     };
@@ -126,6 +181,47 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedCard, actions]);
+
+  const drawDimmedTiles = (
+    ctx: CanvasRenderingContext2D,
+    relevantTiles: Array<{ x: number; y: number }>
+  ) => {
+    ctx.save();
+
+    // Get all tiles that exist on the board
+    const allTiles: Array<{ x: number; y: number }> = [];
+    if (gameState.board) {
+      gameState.board.forEach((card) => {
+        for (let row = 0; row < CARD_HEIGHT; row++) {
+          for (let col = 0; col < CARD_WIDTH; col++) {
+            if (card.cells && card.cells[row] && card.cells[row][col]) {
+              allTiles.push({ x: card.x + col, y: card.y + row });
+            }
+          }
+        }
+      });
+    }
+
+    // Find tiles that should be dimmed (all tiles except the relevant ones)
+    const dimmedTiles = allTiles.filter(
+      (tile) =>
+        !relevantTiles.some(
+          (relevant) => relevant.x === tile.x && relevant.y === tile.y
+        )
+    );
+
+    // Draw dimming overlay on non-relevant tiles
+    dimmedTiles.forEach((tile) => {
+      const x = tile.x * TILE_WIDTH;
+      const y = tile.y * TILE_HEIGHT;
+
+      // Draw dimming overlay
+      ctx.fillStyle = "rgba(0, 0, 0, 0.6)"; // Black with transparency to dim
+      ctx.fillRect(x, y, TILE_WIDTH, TILE_HEIGHT);
+    });
+
+    ctx.restore();
+  };
 
   const drawGrid = (ctx: CanvasRenderingContext2D) => {
     ctx.strokeStyle = "#374151";
@@ -235,11 +331,18 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
 
           // Draw roads if present
           if (cell.roads && cell.roads.length > 0) {
-            ctx.strokeStyle = "#000000";
-            // Road thickness should be proportional to tile size (about 20% of tile width)
-            ctx.lineWidth = TILE_WIDTH * 0.125; // 20% of tile width
+            // Road thickness should be proportional to tile size (about 12.5% of tile width)
+            ctx.lineWidth = TILE_WIDTH * 0.125; // 12.5% of tile width
             cell.roads.forEach((road) => {
-              drawRoad(ctx, cellX, cellY, TILE_WIDTH, TILE_HEIGHT, road);
+              drawRoad(
+                ctx,
+                cellX,
+                cellY,
+                TILE_WIDTH,
+                TILE_HEIGHT,
+                road,
+                undefined
+              );
             });
           }
         }
@@ -253,65 +356,99 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
     ctx.restore();
   };
 
-  const drawCard = (ctx: CanvasRenderingContext2D, card: Card) => {
-    const x = card.x * TILE_WIDTH;
-    const y = card.y * TILE_HEIGHT;
-    const width = CARD_WIDTH * TILE_WIDTH;
-    const height = CARD_HEIGHT * TILE_HEIGHT;
+  const drawTileMap = (ctx: CanvasRenderingContext2D, cards: Card[]) => {
+    // Build tile map from all cards (later cards override earlier ones)
+    const tileMap = new Map<string, { type: string; roads: any[] }>();
 
-    // Save context (no rotation applied - cell data is already rotated)
-    ctx.save();
-
-    // Note: We don't apply canvas rotation here because the card's cell data
-    // has already been rotated by the rotateCard function. Applying rotation
-    // here would result in double rotation.
-
-    // Card background
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(x, y, width, height);
-
-    // Card border - adjust thickness for zoom
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 2 / transform.scale;
-    ctx.strokeRect(x, y, width, height);
-
-    // Draw cell contents (simplified)
-    for (let row = 0; row < CARD_HEIGHT; row++) {
-      for (let col = 0; col < CARD_WIDTH; col++) {
-        if (card.cells && card.cells[row] && card.cells[row][col]) {
-          const cell = card.cells[row][col];
-          const cellX = x + col * TILE_WIDTH;
-          const cellY = y + row * TILE_HEIGHT;
-
-          // Cell background color based on type
-          const cellColor = getCellColor(cell.type);
-          ctx.fillStyle = cellColor;
-          const borderOffset = 1 / transform.scale;
-          ctx.fillRect(
-            cellX + borderOffset,
-            cellY + borderOffset,
-            TILE_WIDTH - 2 * borderOffset,
-            TILE_HEIGHT - 2 * borderOffset
-          );
-
-          // Draw roads if present
-          if (cell.roads && cell.roads.length > 0) {
-            ctx.strokeStyle = "#000000";
-            // Road thickness should be proportional to tile size (about 20% of tile width)
-            ctx.lineWidth = TILE_WIDTH * 0.125; // 20% of tile width
-            cell.roads.forEach((road) => {
-              drawRoad(ctx, cellX, cellY, TILE_WIDTH, TILE_HEIGHT, road);
+    cards.forEach((card) => {
+      for (let row = 0; row < CARD_HEIGHT; row++) {
+        for (let col = 0; col < CARD_WIDTH; col++) {
+          if (card.cells && card.cells[row] && card.cells[row][col]) {
+            const cell = card.cells[row][col];
+            const tileKey = `${card.x + col},${card.y + row}`;
+            tileMap.set(tileKey, {
+              type: cell.type,
+              roads: cell.roads || [],
             });
           }
         }
       }
-    }
+    });
 
-    // Restore context
+    // Draw each unique tile once
+    ctx.save();
+
+    tileMap.forEach((tile, tileKey) => {
+      const [x, y] = tileKey.split(",").map(Number);
+      const cellX = x * TILE_WIDTH;
+      const cellY = y * TILE_HEIGHT;
+
+      // Cell background color based on type
+      const cellColor = getCellColor(tile.type);
+      ctx.fillStyle = cellColor;
+      ctx.fillRect(cellX, cellY, TILE_WIDTH, TILE_HEIGHT);
+
+      // Cell border
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 1 / transform.scale;
+      ctx.strokeRect(cellX, cellY, TILE_WIDTH, TILE_HEIGHT);
+
+      // Roads will be drawn in the second pass
+    });
+
+    ctx.restore();
+  };
+
+  const drawRoadMap = (ctx: CanvasRenderingContext2D, cards: Card[]) => {
+    // Build tile map from all cards (later cards override earlier ones)
+    const tileMap = new Map<string, { type: string; roads: any[] }>();
+
+    cards.forEach((card) => {
+      for (let row = 0; row < CARD_HEIGHT; row++) {
+        for (let col = 0; col < CARD_WIDTH; col++) {
+          if (card.cells && card.cells[row] && card.cells[row][col]) {
+            const cell = card.cells[row][col];
+            const tileKey = `${card.x + col},${card.y + row}`;
+            tileMap.set(tileKey, {
+              type: cell.type,
+              roads: cell.roads || [],
+            });
+          }
+        }
+      }
+    });
+
+    // Second pass: draw all roads
+    ctx.save();
+
+    tileMap.forEach((tile, tileKey) => {
+      if (tile.roads && tile.roads.length > 0) {
+        const [x, y] = tileKey.split(",").map(Number);
+        const cellX = x * TILE_WIDTH;
+        const cellY = y * TILE_HEIGHT;
+
+        ctx.lineWidth = TILE_WIDTH * 0.125; // 12.5% of tile width
+        tile.roads.forEach((road) => {
+          drawRoad(ctx, cellX, cellY, TILE_WIDTH, TILE_HEIGHT, road, tileMap);
+        });
+      }
+    });
+
     ctx.restore();
   };
 
   const getCellColor = (type: string): string => {
+    // Try to find the zone type color from selected variations
+    for (const variation of selectedVariations) {
+      if (variation.zoneTypes) {
+        const zoneType = variation.zoneTypes.find((zt: any) => zt.id === type);
+        if (zoneType) {
+          return zoneType.color;
+        }
+      }
+    }
+
+    // Fallback to hardcoded colors for backwards compatibility
     switch (type) {
       case "residential":
         return "#3b82f6"; // Blue
@@ -322,7 +459,7 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
       case "park":
         return "#22c55e"; // Green
       default:
-        return "#ffffff"; // White
+        return "#e5e7eb"; // Light gray for unknown types
     }
   };
 
@@ -332,7 +469,8 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
     cellY: number,
     tileWidth: number,
     tileHeight: number,
-    road: any
+    road: any,
+    tileMap?: Map<string, { type: string; roads: any[] }>
   ) => {
     const centerX = cellX + tileWidth / 2;
     const centerY = cellY + tileHeight / 2;
@@ -340,22 +478,158 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
     // Road segments are [from_edge, to_edge] where edges are: top=0, right=1, bottom=2, left=3
     if (Array.isArray(road) && road.length === 2) {
       const [fromEdge, toEdge] = road;
+      const roadWidth = ctx.lineWidth;
 
-      ctx.beginPath();
+      // Current tile position
+      const currentTileX = Math.round(cellX / tileWidth);
+      const currentTileY = Math.round(cellY / tileHeight);
 
-      // Draw from center to edges based on road segment
-      const edges = [
-        { x: centerX, y: cellY }, // top
-        { x: cellX + tileWidth, y: centerY }, // right
-        { x: centerX, y: cellY + tileHeight }, // bottom
-        { x: cellX, y: centerY }, // left
-      ];
+      // Check if this edge connects to a road in an adjacent tile
+      const hasRoadConnection = (edge: number) => {
+        if (!tileMap) return false;
+
+        const directions = [
+          [0, -1], // top
+          [1, 0], // right
+          [0, 1], // bottom
+          [-1, 0], // left
+        ];
+
+        const [dx, dy] = directions[edge];
+        const adjacentKey = `${currentTileX + dx},${currentTileY + dy}`;
+        const adjacentTile = tileMap.get(adjacentKey);
+
+        if (!adjacentTile) return false;
+
+        // Check if adjacent tile has a road connecting back to this edge
+        const oppositeEdge = (edge + 2) % 4; // opposite direction
+        return adjacentTile.roads.some((adjacentRoad: any) => {
+          if (Array.isArray(adjacentRoad) && adjacentRoad.length === 2) {
+            return adjacentRoad.includes(oppositeEdge);
+          }
+          return false;
+        });
+      };
+
+      // Calculate edge positions with proper terminal insets
+      const getEdgePosition = (edge: number, isConnected: boolean) => {
+        const inset = isConnected ? 0 : roadWidth * 0.4; // Inset terminal ends
+
+        switch (edge) {
+          case 0: // top
+            return { x: centerX, y: cellY + inset };
+          case 1: // right
+            return { x: cellX + tileWidth - inset, y: centerY };
+          case 2: // bottom
+            return { x: centerX, y: cellY + tileHeight - inset };
+          case 3: // left
+            return { x: cellX + inset, y: centerY };
+          default:
+            return { x: centerX, y: centerY };
+        }
+      };
 
       if (fromEdge >= 0 && fromEdge < 4 && toEdge >= 0 && toEdge < 4) {
-        ctx.moveTo(edges[fromEdge].x, edges[fromEdge].y);
-        ctx.lineTo(centerX, centerY);
-        ctx.lineTo(edges[toEdge].x, edges[toEdge].y);
-        ctx.stroke();
+        const fromConnected = hasRoadConnection(fromEdge);
+        const toConnected = hasRoadConnection(toEdge);
+
+        const fromPos = getEdgePosition(fromEdge, fromConnected);
+        const toPos = getEdgePosition(toEdge, toConnected);
+
+        ctx.save();
+
+        // Draw main road segments with smooth corners
+        ctx.strokeStyle = "#2d3748"; // Dark gray for asphalt
+        ctx.lineWidth = roadWidth;
+        ctx.lineJoin = "round";
+
+        const isCornerRoad = fromEdge !== toEdge;
+
+        if (isCornerRoad) {
+          // For corner roads, draw a smooth curved path
+          const cornerRadius = Math.min(
+            roadWidth * 0.8,
+            Math.min(tileWidth, tileHeight) * 0.3
+          );
+
+          ctx.lineCap = "butt"; // Use butt caps for curves to avoid overlap
+          ctx.beginPath();
+          ctx.moveTo(fromPos.x, fromPos.y);
+
+          // Create smooth curve through center point
+          ctx.arcTo(centerX, centerY, toPos.x, toPos.y, cornerRadius);
+          ctx.lineTo(toPos.x, toPos.y);
+
+          // Apply terminal rounding only to actual ends
+          if (!fromConnected) {
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(fromPos.x, fromPos.y);
+            ctx.lineTo(fromPos.x, fromPos.y);
+            ctx.stroke();
+            ctx.lineCap = "butt";
+          }
+
+          if (!toConnected) {
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(toPos.x, toPos.y);
+            ctx.lineTo(toPos.x, toPos.y);
+            ctx.stroke();
+            ctx.lineCap = "butt";
+          }
+
+          // Draw the main curved road
+          ctx.lineCap = "butt";
+          ctx.beginPath();
+          ctx.moveTo(fromPos.x, fromPos.y);
+          ctx.arcTo(centerX, centerY, toPos.x, toPos.y, cornerRadius);
+          ctx.lineTo(toPos.x, toPos.y);
+          ctx.stroke();
+        } else {
+          // For straight roads, draw a simple line
+          ctx.lineCap = fromConnected && toConnected ? "butt" : "round";
+          if (!fromConnected) ctx.lineCap = "round";
+          if (!toConnected) ctx.lineCap = "round";
+
+          ctx.beginPath();
+          ctx.moveTo(fromPos.x, fromPos.y);
+          ctx.lineTo(toPos.x, toPos.y);
+          ctx.stroke();
+        }
+
+        // Draw road markings (center line or edge lines)
+        ctx.strokeStyle = "#fbbf24"; // Golden yellow for center lines
+        ctx.lineWidth = roadWidth * 0.15; // Thinner marking lines
+        ctx.lineCap = "butt"; // Always square caps for markings
+
+        // Different marking patterns based on road type
+        if (isCornerRoad) {
+          // For corner roads, draw a subtle center guide following the curve
+          ctx.setLineDash([roadWidth * 0.3, roadWidth * 0.2]); // Dashed line
+          const cornerRadius = Math.min(
+            roadWidth * 0.8,
+            Math.min(tileWidth, tileHeight) * 0.3
+          );
+
+          ctx.beginPath();
+          ctx.moveTo(fromPos.x, fromPos.y);
+          ctx.arcTo(centerX, centerY, toPos.x, toPos.y, cornerRadius);
+          ctx.lineTo(toPos.x, toPos.y);
+          ctx.stroke();
+        } else {
+          // For straight roads, draw solid center line
+          ctx.setLineDash([]); // Solid line
+          ctx.beginPath();
+          ctx.moveTo(fromPos.x, fromPos.y);
+          ctx.lineTo(toPos.x, toPos.y);
+          ctx.stroke();
+        }
+
+        // Reset line dash
+        ctx.setLineDash([]);
+
+        ctx.restore();
       }
     }
   };
@@ -372,47 +646,34 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
       "canPlace:",
       canPlace
     );
+
     if (canPlace) {
-      // Calculate mouse position in world coordinates using full window size
-      const canvasX = e.clientX;
-      const canvasY = e.clientY;
-
-      // Transform to world coordinates
-      const worldX =
-        (canvasX - window.innerWidth / 2 - transform.offsetX) / transform.scale;
-      const worldY =
-        (canvasY - window.innerHeight / 2 - transform.offsetY) /
-        transform.scale;
-
-      // Convert to grid coordinates - offset by half a card to center the cursor on the card
-      const gridX = Math.round(
-        (worldX - (CARD_WIDTH * TILE_WIDTH) / 2) / TILE_WIDTH
-      );
-      const gridY = Math.round(
-        (worldY - (CARD_HEIGHT * TILE_HEIGHT) / 2) / TILE_HEIGHT
-      );
-
-      console.log("Placing card at grid:", gridX, gridY);
-      onCardPlace(gridX, gridY);
-    } else {
-      // Start dragging
-      setDragging(true, { x: e.clientX, y: e.clientY });
+      // Start card placement tracking (but also allow panning)
+      setIsCardDragging(true);
+      setCardDragStart({ x: e.clientX, y: e.clientY });
+      console.log("Started card drag");
     }
+
+    // Always allow camera dragging (whether or not we have a card selected)
+    setDragging(true, { x: e.clientX, y: e.clientY });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     // Update preview position if we have a selected card
     if (selectedCard) {
-      // Calculate mouse position in world coordinates
-      const canvasX = e.clientX;
-      const canvasY = e.clientY;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-      // Transform to world coordinates
+      const rect = canvas.getBoundingClientRect();
+      const canvasX = e.clientX - rect.left;
+      const canvasY = e.clientY - rect.top;
+
+      // Transform to world coordinates using actual canvas center
+      const dimensions = getCanvasDimensions();
       const worldX =
-        (canvasX - window.innerWidth / 2 - transform.offsetX) / transform.scale;
+        (canvasX - dimensions.width / 2 - transform.offsetX) / transform.scale;
       const worldY =
-        (canvasY - window.innerHeight / 2 - transform.offsetY) /
-        transform.scale;
+        (canvasY - dimensions.height / 2 - transform.offsetY) / transform.scale;
 
       // Convert to grid coordinates - offset by half a card to center the cursor on the card
       const gridX = Math.round(
@@ -427,7 +688,7 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
       setMouseGridPos(null);
     }
 
-    // Handle dragging
+    // Handle camera dragging
     if (isDragging && dragStart) {
       const deltaX = e.clientX - dragStart.x;
       const deltaY = e.clientY - dragStart.y;
@@ -441,7 +702,54 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (isCardDragging && cardDragStart && selectedCard && onCardPlace) {
+      // Check if this was a drag (mouse moved significantly) or just a click
+      const dragDistance = Math.sqrt(
+        Math.pow(e.clientX - cardDragStart.x, 2) +
+          Math.pow(e.clientY - cardDragStart.y, 2)
+      );
+
+      // If it was a short drag/click (less than 5 pixels), treat as placement
+      if (dragDistance < 5) {
+        console.log("Short click detected - placing card");
+
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+
+        // Transform to world coordinates using actual canvas center
+        const dimensions = getCanvasDimensions();
+        const worldX =
+          (canvasX - dimensions.width / 2 - transform.offsetX) /
+          transform.scale;
+        const worldY =
+          (canvasY - dimensions.height / 2 - transform.offsetY) /
+          transform.scale;
+
+        // Convert to grid coordinates - offset by half a card to center the cursor on the card
+        const gridX = Math.round(
+          (worldX - (CARD_WIDTH * TILE_WIDTH) / 2) / TILE_WIDTH
+        );
+        const gridY = Math.round(
+          (worldY - (CARD_HEIGHT * TILE_HEIGHT) / 2) / TILE_HEIGHT
+        );
+
+        console.log("Placing card at grid:", gridX, gridY);
+        onCardPlace(gridX, gridY);
+      } else {
+        console.log("Long drag detected - not placing card");
+      }
+
+      // Reset card drag state
+      setIsCardDragging(false);
+      setCardDragStart(null);
+    }
+
+    // Always reset camera drag state
     setDragging(false);
   };
 
@@ -494,7 +802,12 @@ export default function GameBoard({ gameState, onCardPlace }: GameBoardProps) {
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={() => {
+        // Reset all drag states when mouse leaves canvas
+        setIsCardDragging(false);
+        setCardDragStart(null);
+        setDragging(false);
+      }}
     />
   );
 }

@@ -1,6 +1,7 @@
 import CardPreview from "./CardPreview";
 import { useSharedGameMachine } from "../providers/GameMachineProvider";
 import { useUIStore } from "../stores/uiStore";
+import { Card } from "../types/game";
 
 export default function PlayerHand() {
   const { actions, selectors } = useSharedGameMachine();
@@ -33,7 +34,7 @@ export default function PlayerHand() {
         </div>
 
         <div className="flex justify-center gap-2">
-          {currentPlayer.hand.map((card) => (
+          {currentPlayer.hand.map((card: Card) => (
             <div key={card.id} className="relative">
               <button
                 onClick={() => actions.selectCard(card)}

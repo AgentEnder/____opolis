@@ -1,5 +1,14 @@
+import { CustomMetadata } from "./metadataSystem";
+
 // Road segments connect edges: top, right, bottom, left (0, 1, 2, 3)
 export type RoadSegment = [number, number]; // [from_edge, to_edge]
+
+export type TileData = CellData & {
+  cardId: string;
+  x: number;
+  y: number;
+  cardIndex: number; // Track which card this is from (later cards are on top)
+};
 
 export interface CellData {
   type: CellType;
@@ -12,9 +21,10 @@ export interface Card {
   y: number;
   cells: CellData[][];
   rotation: number; // 0 or 180 degrees
+  customMetadata?: CustomMetadata;
 }
 
-export type CellType = 'residential' | 'commercial' | 'industrial' | 'park';
+export type CellType = string;
 
 export interface Player {
   id: string;
@@ -29,8 +39,12 @@ export interface GameState {
   deck: Card[];
   board: Card[];
   topCard: Card | null; // Public visible top card of deck
-  gamePhase: 'setup' | 'playing' | 'ended';
+  gamePhase: "setup" | "playing" | "ended";
   turnCount: number;
+  scoring?: {
+    activeConditions: Array<{ id: string; name: string; description: string }>;
+    targetScore: number;
+  };
 }
 
 export interface Transform {

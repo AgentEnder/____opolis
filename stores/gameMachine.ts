@@ -1,6 +1,6 @@
 import { setup, assign, fromPromise } from "xstate";
 import { Card, GameState } from "../types/game";
-import { GameVariation, GAME_VARIATIONS } from "../types/deck";
+import { GameVariation, CustomDeck, GAME_VARIATIONS } from "../types/deck";
 import {
   initializeGame,
   playCard,
@@ -10,7 +10,7 @@ import {
 
 // Game machine context
 export interface GameMachineContext {
-  selectedVariations: GameVariation[];
+  selectedVariations: (GameVariation | CustomDeck)[];
   selectedExpansions: string[];
   playerCount: number;
   gameState: GameState | null;
@@ -22,7 +22,7 @@ export interface GameMachineContext {
 
 // Game machine events
 export type GameMachineEvent =
-  | { type: "SET_VARIATIONS"; variations: GameVariation[] }
+  | { type: "SET_VARIATIONS"; variations: (GameVariation | CustomDeck)[] }
   | { type: "SET_EXPANSIONS"; expansions: string[] }
   | { type: "SET_PLAYER_COUNT"; count: number }
   | { type: "START_GAME" }
@@ -32,7 +32,8 @@ export type GameMachineEvent =
   | { type: "CANCEL_PLACEMENT" }
   | { type: "RESTART_GAME" }
   | { type: "EXIT_GAME" }
-  | { type: "CLEAR_ERROR" };
+  | { type: "CLEAR_ERROR" }
+  | { type: "GAME_OVER_DETECTED" };
 
 export const gameMachine = setup({
   types: {
@@ -79,7 +80,13 @@ export const gameMachine = setup({
     updateGameState: assign({
       gameState: ({ event }) => {
         if ("output" in event) {
-          return event.output as GameState;
+          const newGameState = event.output as GameState;
+          console.log('updateGameState: New game state deck length:', newGameState.deck.length);
+          console.log('updateGameState: Player hands:', newGameState.players.map(p => ({
+            name: p.name,
+            handSize: p.hand.length
+          })));
+          return newGameState;
         }
         return null;
       },
@@ -106,6 +113,28 @@ export const gameMachine = setup({
     clearError: assign({
       error: null,
     }),
+    checkGameOver: ({ context, self }) => {
+      if (!context.gameState) return;
+      
+      const deckEmpty = context.gameState.deck.length === 0;
+      const allPlayersEmpty = context.gameState.players.every(player => player.hand.length === 0);
+      
+      console.log('checkGameOver action called:', {
+        deckEmpty,
+        allPlayersEmpty,
+        deckLength: context.gameState.deck.length,
+        playerHands: context.gameState.players.map(p => ({
+          name: p.name,
+          handSize: p.hand.length
+        }))
+      });
+      
+      if (deckEmpty && allPlayersEmpty) {
+        console.log('Game over detected! Transitioning to gameOver state');
+        // Send internal event to transition to game over
+        self.send({ type: 'GAME_OVER_DETECTED' } as any);
+      }
+    },
   },
   guards: {
     hasValidSetup: ({ context }) => {
@@ -115,6 +144,25 @@ export const gameMachine = setup({
       return g;
     },
     hasSelectedCard: ({ context }) => context.selectedCard !== null,
+    isGameOver: ({ context }) => {
+      if (!context.gameState) return false;
+      
+      // Game is over when deck is empty and all players have no cards
+      const deckEmpty = context.gameState.deck.length === 0;
+      const allPlayersEmpty = context.gameState.players.every(player => player.hand.length === 0);
+      
+      console.log('Game over check:', {
+        deckEmpty,
+        allPlayersEmpty,
+        deckLength: context.gameState.deck.length,
+        playerHands: context.gameState.players.map(p => ({
+          name: p.name,
+          handSize: p.hand.length
+        }))
+      });
+      
+      return deckEmpty && allPlayersEmpty;
+    },
   },
   actors: {
     initializeGame: fromPromise(
@@ -131,10 +179,9 @@ export const gameMachine = setup({
           { length: input.playerCount },
           (_, i) => `Player ${i + 1}`
         );
-        const variationIds = input.selectedVariations.map((v) => v.id);
         return initializeGame(
           playerNames,
-          variationIds,
+          input.selectedVariations,
           input.selectedExpansions
         );
       }
@@ -289,7 +336,7 @@ export const gameMachine = setup({
             }),
             onDone: {
               target: "idle",
-              actions: ["updateGameState", "clearSelection"],
+              actions: ["updateGameState", "clearSelection", "checkGameOver"],
             },
             onError: {
               target: "cardSelected",
@@ -302,6 +349,9 @@ export const gameMachine = setup({
         RESTART_GAME: {
           target: "setup",
           actions: "resetGame",
+        },
+        GAME_OVER_DETECTED: {
+          target: "gameOver",
         },
       },
     },

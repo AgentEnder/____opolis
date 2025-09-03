@@ -6,7 +6,9 @@ import {
   GameState,
   Player,
 } from "../types/game";
-import { GameVariation, CardDefinition, GAME_VARIATIONS } from "../types/deck";
+import { GameVariation, CardDefinition, CustomDeck, GAME_VARIATIONS } from "../types/deck";
+import { getRandomScoringConditions, SCORING_CONDITIONS } from "./scoringConditions";
+import { calculateScore } from "./scoring";
 
 const CARD_WIDTH = 2;
 const CARD_HEIGHT = 2;
@@ -93,19 +95,15 @@ export const generateRandomCard = (id?: string): Card => {
   };
 };
 
+// Enhanced function that supports both preset variations and custom decks
 export const generateDeckFromVariations = (
-  variationIds: string[],
+  variations: (GameVariation | CustomDeck)[],
   selectedExpansions: string[] = []
 ): Card[] => {
   const deck: Card[] = [];
 
-  // Add cards from each selected variation
-  for (const variationId of variationIds) {
-    const variation = GAME_VARIATIONS.find((v) => v.id === variationId);
-    if (!variation) {
-      throw new Error(`Unknown variation: ${variationId}`);
-    }
-
+  // Add cards from each selected variation (preset or custom)
+  for (const variation of variations) {
     // Add base cards from this variation
     for (const cardDef of variation.baseCards) {
       for (let i = 0; i < cardDef.count; i++) {
@@ -119,19 +117,21 @@ export const generateDeckFromVariations = (
       }
     }
 
-    // Add expansion cards from this variation
-    for (const expansionId of selectedExpansions) {
-      const expansion = variation.expansions.find((e) => e.id === expansionId);
-      if (expansion) {
-        for (const cardDef of expansion.cards) {
-          for (let i = 0; i < cardDef.count; i++) {
-            deck.push({
-              id: `${cardDef.id}-${i}`,
-              x: 0,
-              y: 0,
-              cells: cardDef.cells,
-              rotation: 0,
-            });
+    // Add expansion cards from this variation (only for preset variations)
+    if (variation.type !== 'custom' && selectedExpansions.length > 0) {
+      for (const expansionId of selectedExpansions) {
+        const expansion = variation.expansions.find((e) => e.id === expansionId);
+        if (expansion) {
+          for (const cardDef of expansion.cards) {
+            for (let i = 0; i < cardDef.count; i++) {
+              deck.push({
+                id: `${cardDef.id}-${i}`,
+                x: 0,
+                y: 0,
+                cells: cardDef.cells,
+                rotation: 0,
+              });
+            }
           }
         }
       }
@@ -147,12 +147,28 @@ export const generateDeckFromVariations = (
   return deck;
 };
 
+// Legacy function for backwards compatibility - converts IDs to variation objects
+export const generateDeckFromVariationIds = (
+  variationIds: string[],
+  selectedExpansions: string[] = []
+): Card[] => {
+  const variations = variationIds.map(id => {
+    const variation = GAME_VARIATIONS.find((v) => v.id === id);
+    if (!variation) {
+      throw new Error(`Unknown variation: ${id}`);
+    }
+    return variation;
+  });
+
+  return generateDeckFromVariations(variations, selectedExpansions);
+};
+
 // Legacy function for single variation (backwards compatibility)
 export const generateDeckFromVariation = (
   variationId: string,
   selectedExpansions: string[] = []
 ): Card[] => {
-  return generateDeckFromVariations([variationId], selectedExpansions);
+  return generateDeckFromVariationIds([variationId], selectedExpansions);
 };
 
 // Keep the old function for backwards compatibility
@@ -260,10 +276,12 @@ export const isValidPlacement = (
 
 export const initializeGame = (
   playerNames: string[],
-  variationIds: string[] = ["sprawopolis"],
+  variations: (GameVariation | CustomDeck)[] = [],
   selectedExpansions: string[] = []
 ): GameState => {
-  const deck = generateDeckFromVariations(variationIds, selectedExpansions);
+  // If no variations provided, default to sprawopolis
+  const gameVariations = variations.length > 0 ? variations : [GAME_VARIATIONS[0]];
+  const deck = generateDeckFromVariations(gameVariations, selectedExpansions);
   const players: Player[] = playerNames.map((name, index) => ({
     id: `player-${index}`,
     name,
@@ -290,6 +308,11 @@ export const initializeGame = (
   // Get the top card (public)
   const topCard = deck.length > 0 ? deck[deck.length - 1] : null;
 
+  // Set up scoring conditions - pick 3 random conditions for this game
+  const activeConditions = getRandomScoringConditions(3);
+  const targetScore = activeConditions.reduce((sum, condition) => 
+    sum + (condition.targetContribution || 0), 0);
+
   return {
     players,
     currentPlayerIndex: startingPlayerIndex,
@@ -298,6 +321,14 @@ export const initializeGame = (
     topCard,
     gamePhase: "playing",
     turnCount: 0,
+    scoring: {
+      activeConditions: activeConditions.map(c => ({
+        id: c.id,
+        name: c.name,
+        description: c.description
+      })),
+      targetScore
+    },
   };
 };
 
@@ -372,4 +403,35 @@ export const playCard = (
     topCard: newTopCard,
     turnCount: gameState.turnCount + 1,
   };
+};
+
+// Legacy function for backwards compatibility with existing code
+export const initializeGameWithIds = (
+  playerNames: string[],
+  variationIds: string[] = ["sprawopolis"],
+  selectedExpansions: string[] = []
+): GameState => {
+  const variations = variationIds.map(id => {
+    const variation = GAME_VARIATIONS.find((v) => v.id === id);
+    if (!variation) {
+      throw new Error(`Unknown variation: ${id}`);
+    }
+    return variation;
+  });
+
+  return initializeGame(playerNames, variations, selectedExpansions);
+};
+
+// Calculate current score for a game state
+export const getCurrentScore = (gameState: GameState) => {
+  if (!gameState.scoring) {
+    return calculateScore(gameState.board);
+  }
+  
+  // Get the actual scoring condition functions
+  const activeConditions = gameState.scoring.activeConditions.map(conditionInfo => {
+    return SCORING_CONDITIONS[conditionInfo.id];
+  }).filter(Boolean); // Remove any undefined conditions
+  
+  return calculateScore(gameState.board, activeConditions);
 };

@@ -28,6 +28,12 @@ export interface UIState {
   notificationMessage: string;
   notificationType: 'success' | 'error' | 'info';
   
+  // Scoring visualization state
+  highlightedTiles: Array<{ x: number; y: number }> | null;
+  highlightedCondition: string | null; // ID of the condition being hovered
+  highlightedClusterType: 'residential' | 'commercial' | 'industrial' | 'park' | null;
+  showRoadNetworks: boolean;
+  
   // Actions
   setTransform: (transform: Partial<Transform>) => void;
   setDragging: (isDragging: boolean, dragStart?: { x: number; y: number }) => void;
@@ -37,6 +43,10 @@ export interface UIState {
   showNotificationMessage: (message: string, type?: 'success' | 'error' | 'info') => void;
   hideNotification: () => void;
   resetUI: () => void;
+  setHighlightedTiles: (tiles: Array<{ x: number; y: number }> | null) => void;
+  setHighlightedCondition: (conditionId: string | null) => void;
+  setHighlightedClusterType: (type: 'residential' | 'commercial' | 'industrial' | 'park' | null) => void;
+  setShowRoadNetworks: (show: boolean) => void;
 }
 
 // Default state
@@ -55,6 +65,10 @@ const defaultState = {
   showNotification: false,
   notificationMessage: '',
   notificationType: 'info' as const,
+  highlightedTiles: null,
+  highlightedCondition: null,
+  highlightedClusterType: null,
+  showRoadNetworks: false,
 };
 
 export const useUIStore = create<UIState>()(
@@ -106,6 +120,19 @@ export const useUIStore = create<UIState>()(
     // Reset UI to default state
     resetUI: () =>
       set(() => defaultState),
+    
+    // Scoring visualization actions
+    setHighlightedTiles: (tiles: Array<{ x: number; y: number }> | null) =>
+      set(() => ({ highlightedTiles: tiles })),
+    
+    setHighlightedCondition: (conditionId: string | null) =>
+      set(() => ({ highlightedCondition: conditionId })),
+    
+    setHighlightedClusterType: (type: 'residential' | 'commercial' | 'industrial' | 'park' | null) =>
+      set(() => ({ highlightedClusterType: type })),
+    
+    setShowRoadNetworks: (show: boolean) =>
+      set(() => ({ showRoadNetworks: show })),
   }))
 );
 

@@ -1,107 +1,77 @@
-import React, { createContext, useContext } from 'react';
-import { useMachine } from '@xstate/react';
-import { gameMachine, GameMachineEvent } from '../stores/gameMachine';
+import { createActorContext } from '@xstate/react';
+import { gameMachine } from '../stores/gameMachine';
 import { GameVariation } from '../types/deck';
 import { Card } from '../types/game';
 
-// Create context for sharing the machine instance
-interface GameMachineContextValue {
-  state: any;
-  send: (event: GameMachineEvent) => void;
-  actions: {
-    setVariations: (variations: GameVariation[]) => void;
-    setExpansions: (expansions: string[]) => void;
-    setPlayerCount: (count: number) => void;
-    startGame: () => void;
-    selectCard: (card: Card) => void;
-    rotateCard: () => void;
-    placeCard: (x: number, y: number) => void;
-    cancelPlacement: () => void;
-    restartGame: () => void;
-    exitGame: () => void;
-    clearError: () => void;
-  };
-  selectors: {
-    isSetup: boolean;
-    isInitializing: boolean;
-    isPlaying: boolean;
-    isIdle: boolean;
-    isCardSelected: boolean;
-    isPlacing: boolean;
-    isGameOver: boolean;
-    gameState: any;
-    selectedCard: any;
-    cardRotation: number;
-    selectedVariations: GameVariation[];
-    selectedExpansions: string[];
-    playerCount: number;
-    error: string | null;
-    currentPlayer: any;
-    canStartGame: boolean;
-  };
-}
+// Create the actor context using XState's createActorContext
+export const GameMachineContext = createActorContext(gameMachine);
 
-const GameMachineContext = createContext<GameMachineContextValue | undefined>(undefined);
-
-export function GameMachineProvider({ children }: { children: React.ReactNode }) {
-  const [state, _send] = useMachine(gameMachine);
-
-  console.log('GameMachineProvider render - state:', state.value);
-
-  const send = (event: GameMachineEvent) => {
-    console.log('GameMachineProvider - sending event:', event);
-    _send(event);
+// Custom hook that provides a convenient API
+export const useSharedGameMachine = () => {
+  const actorRef = GameMachineContext.useActorRef();
+  const snapshot = GameMachineContext.useSelector((state) => state);
+  
+  const selectors = {
+    // State selectors
+    isSetup: snapshot.matches('setup'),
+    isInitializing: snapshot.matches('initializing'),
+    isPlaying: snapshot.matches('playing'),
+    isIdle: snapshot.matches({ playing: 'idle' }),
+    isCardSelected: snapshot.matches({ playing: 'cardSelected' }),
+    isPlacing: snapshot.matches({ playing: 'placing' }),
+    isGameOver: snapshot.matches('gameOver'),
+    
+    // Context selectors
+    selectedVariations: snapshot.context.selectedVariations,
+    selectedExpansions: snapshot.context.selectedExpansions,
+    playerCount: snapshot.context.playerCount,
+    gameState: snapshot.context.gameState,
+    selectedCard: snapshot.context.selectedCard,
+    cardRotation: snapshot.context.cardRotation,
+    placementPos: snapshot.context.placementPos,
+    error: snapshot.context.error,
+    
+    // Computed selectors
+    canStartGame: snapshot.context.selectedVariations.length > 0 && snapshot.context.playerCount >= 2,
+    currentPlayer: snapshot.context.gameState ? 
+      snapshot.context.gameState.players[snapshot.context.gameState.currentPlayerIndex] : 
+      null,
   };
 
   const actions = {
-    setVariations: (variations: GameVariation[]) =>
-      send({ type: 'SET_VARIATIONS', variations }),
-    setExpansions: (expansions: string[]) =>
-      send({ type: 'SET_EXPANSIONS', expansions }),
-    setPlayerCount: (count: number) =>
-      send({ type: 'SET_PLAYER_COUNT', count }),
-    startGame: () => send({ type: 'START_GAME' }),
-    selectCard: (card: Card) => send({ type: 'SELECT_CARD', card }),
-    rotateCard: () => send({ type: 'ROTATE_CARD' }),
-    placeCard: (x: number, y: number) => send({ type: 'PLACE_CARD', x, y }),
-    cancelPlacement: () => send({ type: 'CANCEL_PLACEMENT' }),
-    restartGame: () => send({ type: 'RESTART_GAME' }),
-    exitGame: () => send({ type: 'EXIT_GAME' }),
-    clearError: () => send({ type: 'CLEAR_ERROR' }),
+    setVariations: (variations: (GameVariation | any)[]) => 
+      actorRef.send({ type: 'SET_VARIATIONS', variations }),
+    setExpansions: (expansions: string[]) => 
+      actorRef.send({ type: 'SET_EXPANSIONS', expansions }),
+    setPlayerCount: (count: number) => 
+      actorRef.send({ type: 'SET_PLAYER_COUNT', count }),
+    startGame: () => 
+      actorRef.send({ type: 'START_GAME' }),
+    selectCard: (card: Card) => 
+      actorRef.send({ type: 'SELECT_CARD', card }),
+    rotateCard: () => 
+      actorRef.send({ type: 'ROTATE_CARD' }),
+    placeCard: (x: number, y: number) => 
+      actorRef.send({ type: 'PLACE_CARD', x, y }),
+    cancelPlacement: () => 
+      actorRef.send({ type: 'CANCEL_PLACEMENT' }),
+    restartGame: () => 
+      actorRef.send({ type: 'RESTART_GAME' }),
+    exitGame: () => 
+      actorRef.send({ type: 'EXIT_GAME' }),
+    clearError: () => 
+      actorRef.send({ type: 'CLEAR_ERROR' }),
   };
 
-  const selectors = {
-    isSetup: state.matches('setup'),
-    isInitializing: state.matches('initializing'),
-    isPlaying: state.matches('playing'),
-    isIdle: state.matches({ playing: 'idle' }),
-    isCardSelected: state.matches({ playing: 'cardSelected' }),
-    isPlacing: state.matches({ playing: 'placing' }),
-    isGameOver: state.matches('gameOver'),
-    gameState: state.context.gameState,
-    selectedCard: state.context.selectedCard,
-    cardRotation: state.context.cardRotation,
-    selectedVariations: state.context.selectedVariations,
-    selectedExpansions: state.context.selectedExpansions,
-    playerCount: state.context.playerCount,
-    error: state.context.error,
-    currentPlayer: state.context.gameState
-      ? state.context.gameState.players[state.context.gameState.currentPlayerIndex]
-      : null,
-    canStartGame: state.context.selectedVariations.length > 0 && state.context.playerCount >= 2,
+  return {
+    selectors,
+    actions,
+    state: snapshot, // For compatibility with DebugInfo component
   };
+};
 
-  return (
-    <GameMachineContext.Provider value={{ state, send, actions, selectors }}>
-      {children}
-    </GameMachineContext.Provider>
-  );
-}
+// Export the context type for typing purposes
+export type GameMachineContextValue = ReturnType<typeof useSharedGameMachine>;
 
-export function useSharedGameMachine() {
-  const context = useContext(GameMachineContext);
-  if (context === undefined) {
-    throw new Error('useSharedGameMachine must be used within a GameMachineProvider');
-  }
-  return context;
-}
+// Export the provider component
+export const GameMachineProvider = GameMachineContext.Provider;

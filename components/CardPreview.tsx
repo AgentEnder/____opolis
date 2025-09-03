@@ -1,18 +1,30 @@
 import React from 'react';
 import { Card, CellType, RoadSegment } from '../types/game';
+import { CardDefinition, ZoneType } from '../types/deck';
 import { rotateCard } from '../utils/gameLogic';
 
+// Union type that works with both Card and CardDefinition
+type CardLike = Card | (CardDefinition & { x?: number; y?: number; rotation?: number });
+
 interface CardPreviewProps {
-  card: Card;
+  card: CardLike;
   width: number;
   height: number;
   rotation?: number;
   showBorder?: boolean;
   borderColor?: string;
   className?: string;
+  zoneTypes?: ZoneType[];
+  showLabels?: boolean;
 }
 
-const getCellColor = (type: CellType): string => {
+const getCellColor = (type: CellType, zoneTypes?: ZoneType[]): string => {
+  if (zoneTypes) {
+    const zoneType = zoneTypes.find(zt => zt.id === type);
+    if (zoneType) return zoneType.color;
+  }
+  
+  // Fallback to hardcoded colors for backwards compatibility
   switch (type) {
     case 'residential': return '#60a5fa';
     case 'commercial': return '#f59e0b';
@@ -117,9 +129,14 @@ export default function CardPreview({
   rotation = 0,
   showBorder = true,
   borderColor = 'border-gray-400',
-  className = ''
+  className = '',
+  zoneTypes,
+  showLabels = true
 }: CardPreviewProps) {
-  const displayCard = rotation !== 0 ? rotateCard(card, rotation) : card;
+  // Only rotate if we have a full Card object with x,y,rotation properties
+  const displayCard = rotation !== 0 && 'x' in card && 'y' in card && 'rotation' in card 
+    ? rotateCard(card as Card, rotation) 
+    : card;
   const cellWidth = width / 2;
   const cellHeight = height / 2;
 
@@ -135,7 +152,7 @@ export default function CardPreview({
               key={`${rowIndex}-${colIndex}`}
               className="relative"
               style={{
-                backgroundColor: getCellColor(cellData.type),
+                backgroundColor: getCellColor(cellData.type, zoneTypes),
               }}
             >
               {cellData.roads.map((roadSegment, roadIndex) => (

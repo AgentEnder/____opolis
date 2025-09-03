@@ -1,7 +1,10 @@
-import React from 'react';
-import { GAME_VARIATIONS, GameVariation } from '../types/deck';
+import React, { useState } from 'react';
+import { GAME_VARIATIONS, GameVariation, CustomDeck } from '../types/deck';
 import { useSharedGameMachine } from '../providers/GameMachineProvider';
 import { useUIStore } from '../stores/uiStore';
+import { useCustomDecksStore } from '../stores/customDecksStore';
+import CustomDeckSelector from './deck-management/CustomDeckSelector';
+import DeckImportExport from './deck-management/DeckImportExport';
 
 interface GameSetupProps {
   onExit: () => void;
@@ -10,6 +13,9 @@ interface GameSetupProps {
 export default function GameSetup({ onExit }: GameSetupProps) {
   const { actions, selectors } = useSharedGameMachine();
   const { showNotificationMessage } = useUIStore();
+  const { customDecks } = useCustomDecksStore();
+  const [selectedCustomDecks, setSelectedCustomDecks] = useState<CustomDeck[]>([]);
+  const [showDeckModal, setShowDeckModal] = useState(false);
 
   const {
     selectedVariations,
@@ -47,11 +53,31 @@ export default function GameSetup({ onExit }: GameSetupProps) {
     actions.setExpansions(newExpansions);
   };
 
+  const toggleCustomDeck = (deck: CustomDeck) => {
+    const isSelected = selectedCustomDecks.some(d => d.id === deck.id);
+    if (isSelected) {
+      setSelectedCustomDecks(selectedCustomDecks.filter(d => d.id !== deck.id));
+    } else {
+      setSelectedCustomDecks([...selectedCustomDecks, deck]);
+    }
+  };
+
+  const hasAnySelection = selectedVariations.length > 0 || selectedCustomDecks.length > 0;
+
   const handleStartGame = () => {
-    if (!canStartGame) {
-      showNotificationMessage('Please select at least one city variation', 'error');
+    if (!hasAnySelection) {
+      showNotificationMessage('Please select at least one deck or city variation', 'error');
       return;
     }
+    
+    // Combine preset variations with custom decks for game initialization
+    const allVariationIds = [
+      ...selectedVariations.map(v => v.id),
+      ...selectedCustomDecks.map(d => d.id)
+    ];
+    
+    // Pass both preset and custom variations to the game machine
+    actions.setVariations([...selectedVariations, ...selectedCustomDecks]);
     actions.startGame();
   };
 
@@ -156,6 +182,33 @@ export default function GameSetup({ onExit }: GameSetupProps) {
           </div>
         )}
         
+        {/* Custom Decks Section */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-3">
+            <label className="block text-lg font-semibold">Custom Decks</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.location.href = '/deck-editor'}
+                className="text-sm text-green-600 hover:text-green-800 font-semibold"
+              >
+                Deck Editor
+              </button>
+              <button
+                onClick={() => setShowDeckModal(true)}
+                className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
+              >
+                Manage Decks
+              </button>
+            </div>
+          </div>
+          
+          <CustomDeckSelector
+            selectedDecks={selectedCustomDecks}
+            onToggleDeck={toggleCustomDeck}
+            onCreateDeck={() => setShowDeckModal(true)}
+          />
+        </div>
+        
         {/* Game Settings */}
         <div className="mb-6">
           <label className="block text-lg font-semibold mb-3">Players</label>
@@ -173,43 +226,81 @@ export default function GameSetup({ onExit }: GameSetupProps) {
         {/* Deck Summary */}
         <div className="mb-6 p-4 bg-gray-100 rounded-lg">
           <h4 className="font-semibold mb-2">Deck Summary</h4>
-          <div className="mb-2">
-            {selectedVariations.map((variation, index) => (
-              <span key={variation.id}>
-                <strong style={{ color: variation.theme.primaryColor }}>{variation.name}</strong>
-                {index < selectedVariations.length - 1 && ' + '}
-              </span>
-            ))}
-            <span className="text-sm text-gray-600 ml-2">with {selectedExpansions.length} expansion(s)</span>
-          </div>
-          <p className="text-sm text-gray-600">
-            Total cards: {selectedVariations.reduce((total, variation) => 
-              total + variation.baseCards.reduce((sum, card) => sum + card.count, 0), 0
-            ) + selectedExpansions.reduce((sum, expId) => {
-              const exp = availableExpansions.find(e => e.id === expId);
-              return sum + (exp?.cards.reduce((s, card) => s + card.count, 0) || 0);
-            }, 0)}
-          </p>
+          
+          {(selectedVariations.length > 0 || selectedCustomDecks.length > 0) ? (
+            <>
+              <div className="mb-2">
+                {/* Preset Variations */}
+                {selectedVariations.map((variation, index) => (
+                  <span key={variation.id}>
+                    <strong style={{ color: variation.theme.primaryColor }}>{variation.name}</strong>
+                    {(index < selectedVariations.length - 1 || selectedCustomDecks.length > 0) && ' + '}
+                  </span>
+                ))}
+                
+                {/* Custom Decks */}
+                {selectedCustomDecks.map((deck, index) => (
+                  <span key={deck.id}>
+                    <strong style={{ color: deck.theme.primaryColor }}>
+                      {deck.name} <span className="text-xs">(Custom)</span>
+                    </strong>
+                    {index < selectedCustomDecks.length - 1 && ' + '}
+                  </span>
+                ))}
+                
+                <span className="text-sm text-gray-600 ml-2">with {selectedExpansions.length} expansion(s)</span>
+              </div>
+              <p className="text-sm text-gray-600">
+                Total cards: {
+                  selectedVariations.reduce((total, variation) => 
+                    total + variation.baseCards.reduce((sum, card) => sum + card.count, 0), 0
+                  ) + 
+                  selectedCustomDecks.reduce((total, deck) => 
+                    total + deck.baseCards.reduce((sum, card) => sum + card.count, 0), 0
+                  ) +
+                  selectedExpansions.reduce((sum, expId) => {
+                    const exp = availableExpansions.find(e => e.id === expId);
+                    return sum + (exp?.cards.reduce((s, card) => s + card.count, 0) || 0);
+                  }, 0)
+                }
+              </p>
+            </>
+          ) : (
+            <p className="text-gray-500 text-sm">No decks selected</p>
+          )}
         </div>
         
         <div className="flex gap-4">
           <button
             onClick={handleStartGame}
-            disabled={!canStartGame}
+            disabled={!hasAnySelection}
             className={`flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold transition-opacity ${
-              canStartGame ? 'hover:opacity-90' : 'opacity-50 cursor-not-allowed'
+              hasAnySelection ? 'hover:opacity-90' : 'opacity-50 cursor-not-allowed'
             }`}
             style={{ 
-              background: selectedVariations.length === 1 
-                ? selectedVariations[0].theme.primaryColor
-                : selectedVariations.length > 1 
-                  ? `linear-gradient(45deg, ${selectedVariations.map(v => v.theme.primaryColor).join(', ')})` 
-                  : '#9ca3af'
+              background: (() => {
+                const allSelectedDecks = [...selectedVariations, ...selectedCustomDecks];
+                if (allSelectedDecks.length === 1) {
+                  return allSelectedDecks[0].theme.primaryColor;
+                } else if (allSelectedDecks.length > 1) {
+                  return `linear-gradient(45deg, ${allSelectedDecks.map(v => v.theme.primaryColor).join(', ')})`;
+                } else {
+                  return '#9ca3af';
+                }
+              })()
             }}
           >
-            Start {selectedVariations.length === 1 
-              ? selectedVariations[0].name 
-              : `${selectedVariations.length} Cities`}
+            Start {(() => {
+              const totalDecks = selectedVariations.length + selectedCustomDecks.length;
+              if (totalDecks === 1) {
+                const singleDeck = selectedVariations[0] || selectedCustomDecks[0];
+                return singleDeck.name;
+              } else if (totalDecks > 1) {
+                return `${totalDecks} Decks`;
+              } else {
+                return 'Game';
+              }
+            })()}
           </button>
           <button
             onClick={onExit}
@@ -219,6 +310,12 @@ export default function GameSetup({ onExit }: GameSetupProps) {
           </button>
         </div>
       </div>
+      
+      {/* Deck Management Modal */}
+      <DeckImportExport 
+        isOpen={showDeckModal}
+        onClose={() => setShowDeckModal(false)}
+      />
     </div>
   );
 }
