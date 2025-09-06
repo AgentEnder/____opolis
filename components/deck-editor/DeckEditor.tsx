@@ -120,6 +120,7 @@ export default function DeckEditor({ deckId }: DeckEditorProps) {
         customScoringConditions: currentDeck.customScoringConditions,
         zoneTypes: currentDeck.zoneTypes,
         theme: currentDeck.theme,
+        metadataSchema: currentDeck.metadataSchema,
       });
 
       // Update the current deck state with the saved version
@@ -330,7 +331,6 @@ export default function DeckEditor({ deckId }: DeckEditorProps) {
             </div>
           </div>
         )}
-
         {activeTab === 'metadata' && <MetadataEditor />}
         {activeTab === 'analytics' && <DeckAnalytics />}
         {activeTab === 'testing' && (

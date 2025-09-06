@@ -4,7 +4,7 @@ import { useSharedGameMachine } from '../providers/GameMachineProvider';
 import { useUIStore } from '../stores/uiStore';
 import { useCustomDecksStore } from '../stores/customDecksStore';
 import CustomDeckSelector from './deck-management/CustomDeckSelector';
-import DeckImportExport from './deck-management/DeckImportExport';
+import CustomDeckPreview from './game/CustomDeckPreview';
 
 interface GameSetupProps {
   onExit: () => void;
@@ -15,13 +15,12 @@ export default function GameSetup({ onExit }: GameSetupProps) {
   const { showNotificationMessage } = useUIStore();
   const { customDecks } = useCustomDecksStore();
   const [selectedCustomDecks, setSelectedCustomDecks] = useState<CustomDeck[]>([]);
-  const [showDeckModal, setShowDeckModal] = useState(false);
+  const [previewDeck, setPreviewDeck] = useState<CustomDeck | null>(null);
 
   const {
     selectedVariations,
     selectedExpansions, 
     playerCount,
-    canStartGame,
     error
   } = selectors;
 
@@ -69,12 +68,6 @@ export default function GameSetup({ onExit }: GameSetupProps) {
       showNotificationMessage('Please select at least one deck or city variation', 'error');
       return;
     }
-    
-    // Combine preset variations with custom decks for game initialization
-    const allVariationIds = [
-      ...selectedVariations.map(v => v.id),
-      ...selectedCustomDecks.map(d => d.id)
-    ];
     
     // Pass both preset and custom variations to the game machine
     actions.setVariations([...selectedVariations, ...selectedCustomDecks]);
@@ -194,7 +187,7 @@ export default function GameSetup({ onExit }: GameSetupProps) {
                 Deck Editor
               </button>
               <button
-                onClick={() => setShowDeckModal(true)}
+                onClick={() => window.location.href = '/deck-management'}
                 className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
               >
                 Manage Decks
@@ -205,7 +198,8 @@ export default function GameSetup({ onExit }: GameSetupProps) {
           <CustomDeckSelector
             selectedDecks={selectedCustomDecks}
             onToggleDeck={toggleCustomDeck}
-            onCreateDeck={() => setShowDeckModal(true)}
+            onCreateDeck={() => window.location.href = '/deck-management'}
+            onPreviewDeck={(deck) => setPreviewDeck(deck)}
           />
         </div>
         
@@ -311,11 +305,20 @@ export default function GameSetup({ onExit }: GameSetupProps) {
         </div>
       </div>
       
-      {/* Deck Management Modal */}
-      <DeckImportExport 
-        isOpen={showDeckModal}
-        onClose={() => setShowDeckModal(false)}
-      />
+      {/* Custom Deck Preview Modal */}
+      {previewDeck && (
+        <CustomDeckPreview
+          deck={previewDeck}
+          isOpen={!!previewDeck}
+          onClose={() => setPreviewDeck(null)}
+          onAddToGame={() => {
+            if (!selectedCustomDecks.some(d => d.id === previewDeck.id)) {
+              toggleCustomDeck(previewDeck);
+            }
+            setPreviewDeck(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ export type TileData = CellData & {
 export interface CellData {
   type: CellType;
   roads: RoadSegment[]; // Road segments in this cell
+  customMetadata?: CustomMetadata; // Custom metadata for this individual cell
 }
 
 export interface Card {
@@ -21,7 +22,6 @@ export interface Card {
   y: number;
   cells: CellData[][];
   rotation: number; // 0 or 180 degrees
-  customMetadata?: CustomMetadata;
 }
 
 export type CellType = string;
@@ -44,6 +44,7 @@ export interface GameState {
   scoring?: {
     activeConditions: Array<{ id: string; name: string; description: string }>;
     targetScore: number;
+    customConditions?: any[]; // Store custom scoring conditions
   };
 }
 

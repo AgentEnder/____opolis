@@ -3,6 +3,8 @@ import { GameState, Card } from "../types/game";
 import { useUIStore } from "../stores/uiStore";
 import { GameMachineContextValue } from "../providers/GameMachineProvider";
 import { RuleTestMachineContextType } from "../providers/RuleTestMachineProvider";
+import { renderZoneMetadataOnCanvas } from "../utils/metadataRenderer";
+import { CustomMetadataField } from "../types/metadataSystem";
 
 interface GameBoardProps {
   gameState: GameState;
@@ -86,7 +88,7 @@ export default function GameBoard({
     return { width: window.innerWidth, height: window.innerHeight };
   }, [width, height, containerRef]);
 
-  const draw = useCallback(() => {
+  const draw = useCallback(async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -114,11 +116,13 @@ export default function GameBoard({
     // Draw grid
     drawGrid(ctx);
 
-    // Draw tiles using tile map approach for better performance (two-pass rendering)
+    // Draw tiles using tile map approach for better performance (multi-pass rendering)
     if (gameState.board) {
       drawTileMap(ctx, gameState.board);
       // Second pass: draw all roads on top
       drawRoadMap(ctx, gameState.board);
+      // Third pass: draw metadata on top of roads
+      await drawMetadata(ctx, gameState.board);
     }
 
     // Draw dimmed tiles for scoring visualization
@@ -434,6 +438,111 @@ export default function GameBoard({
       }
     });
 
+    ctx.restore();
+  };
+
+  const drawMetadata = async (ctx: CanvasRenderingContext2D, cards: Card[]) => {
+    // Get metadata schema from current deck variations (if available)
+    let metadataFields: CustomMetadataField[] = [];
+    for (const variation of selectedVariations) {
+      if (variation.metadataSchema?.fields) {
+        metadataFields = variation.metadataSchema.fields;
+        break;
+      }
+    }
+
+    if (metadataFields.length === 0) {
+      return; // No metadata fields to render
+    }
+
+    // Build tile map with metadata from all cards (later cards override earlier ones)
+    const tileMap = new Map<string, { 
+      type: string; 
+      metadata?: any; 
+      row: number; 
+      col: number;
+      cell: any;
+    }>();
+
+    cards.forEach((card) => {
+      for (let row = 0; row < CARD_HEIGHT; row++) {
+        for (let col = 0; col < CARD_WIDTH; col++) {
+          if (card.cells && card.cells[row] && card.cells[row][col]) {
+            const cell = card.cells[row][col];
+            const tileKey = `${card.x + col},${card.y + row}`;
+            tileMap.set(tileKey, {
+              type: cell.type,
+              metadata: cell.customMetadata,
+              row: row,
+              col: col,
+              cell: cell,
+            });
+          }
+        }
+      }
+    });
+
+    // Third pass: draw metadata on each tile
+    for (const [tileKey, tile] of tileMap.entries()) {
+      if (!tile.metadata) continue; // Skip tiles without metadata
+      
+      const [x, y] = tileKey.split(",").map(Number);
+      const cellX = x * TILE_WIDTH;
+      const cellY = y * TILE_HEIGHT;
+      
+      try {
+        // Render metadata using the new Canvas approach
+        await renderZoneMetadataOnCanvas(
+          ctx,
+          cellX,
+          cellY,
+          TILE_WIDTH,
+          TILE_HEIGHT,
+          tile.cell,
+          { row: tile.row, col: tile.col },
+          metadataFields,
+          gameState
+        );
+      } catch (error) {
+        console.warn(`Error rendering metadata for tile ${tileKey}:`, error);
+        // Fallback: Draw simple metadata representation
+        drawSimpleMetadata(ctx, tile.metadata, cellX, cellY, TILE_WIDTH, TILE_HEIGHT);
+      }
+    }
+  };
+
+
+  const drawSimpleMetadata = (
+    ctx: CanvasRenderingContext2D,
+    metadata: any,
+    cellX: number,
+    cellY: number,
+    cellWidth: number,
+    cellHeight: number
+  ) => {
+    if (!metadata || Object.keys(metadata).length === 0) return;
+
+    ctx.save();
+    
+    // Draw a simple indicator that metadata exists (small dot in top-right corner)
+    const dotRadius = Math.max(2, cellWidth / 20);
+    const dotX = cellX + cellWidth - dotRadius - 2;
+    const dotY = cellY + dotRadius + 2;
+    
+    ctx.fillStyle = '#ff6b35'; // Orange dot to indicate metadata
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, dotRadius, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // Optionally show first metadata value as text (very small)
+    const firstValue = Object.values(metadata)[0];
+    if (firstValue !== undefined && firstValue !== null && firstValue !== '') {
+      ctx.fillStyle = '#333';
+      ctx.font = `${Math.max(8, cellWidth / 15) / transform.scale}px Arial`;
+      ctx.textAlign = 'left';
+      ctx.fillText(String(firstValue).slice(0, 3), cellX + 2, cellY + 12);
+    }
+    
     ctx.restore();
   };
 

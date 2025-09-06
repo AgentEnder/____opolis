@@ -99,7 +99,7 @@ export default function GameInfo({
                               onMouseEnter={() => {
                                 const tiles = cluster.tiles.map(t => ({ x: t.x, y: t.y }));
                                 setHighlightedTiles(tiles);
-                                setHighlightedClusterType(type);
+                                setHighlightedClusterType(type as 'residential' | 'commercial' | 'industrial' | 'park');
                               }}
                               onMouseLeave={() => {
                                 setHighlightedTiles(null);

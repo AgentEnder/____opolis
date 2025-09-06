@@ -8,6 +8,7 @@ export interface ZoneType {
   name: string;
   color: string;
   description?: string;
+  defaultMetadata?: CustomMetadata; // Default metadata values for cells of this zone type
 }
 
 export interface CardDefinition {
@@ -16,7 +17,7 @@ export interface CardDefinition {
   cells: CellData[][];
   count: number; // How many of this card are in the deck
   scoringConditionId?: string; // References a scoring condition in the deck
-  customMetadata?: CustomMetadata;
+  // customMetadata removed - metadata now lives at the cell/zone level
 }
 
 export interface Expansion {
@@ -70,7 +71,7 @@ const ROADS = {
 };
 
 // Sprawopolis (Urban sprawl theme)
-const SPRAWOPOLIS: GameVariation = {
+export const SPRAWOPOLIS: GameVariation = {
   id: 'sprawopolis',
   name: 'Sprawopolis',
   description: 'The original urban planning card game',
@@ -95,7 +96,8 @@ const SPRAWOPOLIS: GameVariation = {
       cells: [
         [cell('residential'), cell('residential')],
         [cell('residential'), cell('park')]
-      ]
+      ],
+      scoringConditionId: 'spr-001-residential-block'
     },
     {
       id: 'spr-002', 
@@ -104,7 +106,8 @@ const SPRAWOPOLIS: GameVariation = {
       cells: [
         [cell('residential', ROADS.HORIZONTAL), cell('residential', ROADS.HORIZONTAL)],
         [cell('park'), cell('residential')]
-      ]
+      ],
+      scoringConditionId: 'spr-002-suburb'
     },
     // Commercial districts
     {
@@ -114,7 +117,8 @@ const SPRAWOPOLIS: GameVariation = {
       cells: [
         [cell('commercial'), cell('commercial')],
         [cell('commercial'), cell('residential')]
-      ]
+      ],
+      scoringConditionId: 'spr-003-shopping-district'
     },
     {
       id: 'spr-004',
@@ -123,7 +127,8 @@ const SPRAWOPOLIS: GameVariation = {
       cells: [
         [cell('commercial', ROADS.VERTICAL), cell('park')],
         [cell('commercial', ROADS.VERTICAL), cell('commercial')]
-      ]
+      ],
+      scoringConditionId: 'spr-004-main-street'
     },
     // Industrial areas
     {
@@ -133,7 +138,8 @@ const SPRAWOPOLIS: GameVariation = {
       cells: [
         [cell('industrial'), cell('industrial')],
         [cell('industrial'), cell('park')]
-      ]
+      ],
+      scoringConditionId: 'spr-005-factory-district'
     },
     {
       id: 'spr-006',
@@ -142,7 +148,8 @@ const SPRAWOPOLIS: GameVariation = {
       cells: [
         [cell('industrial', ROADS.L_TOP_RIGHT), cell('commercial')],
         [cell('park'), cell('industrial')]
-      ]
+      ],
+      scoringConditionId: 'spr-006-warehouse'
     },
     // Mixed development
     {
@@ -152,7 +159,8 @@ const SPRAWOPOLIS: GameVariation = {
       cells: [
         [cell('commercial'), cell('residential')],
         [cell('park'), cell('industrial')]
-      ]
+      ],
+      scoringConditionId: 'spr-007-mixed-use'
     },
     // Road-heavy cards
     {
@@ -162,7 +170,8 @@ const SPRAWOPOLIS: GameVariation = {
       cells: [
         [cell('park', ROADS.L_LEFT_TOP), cell('commercial', ROADS.L_TOP_RIGHT)],
         [cell('residential', ROADS.L_BOTTOM_LEFT), cell('industrial', ROADS.L_RIGHT_BOTTOM)]
-      ]
+      ],
+      scoringConditionId: 'spr-008-intersection'
     }
   ],
   expansions: [
@@ -178,7 +187,8 @@ const SPRAWOPOLIS: GameVariation = {
           cells: [
             [cell('park'), cell('park')],
             [cell('residential'), cell('commercial')]
-          ]
+          ],
+          scoringConditionId: 'spr-beach-001-beachfront'
         },
         {
           id: 'spr-beach-002',
@@ -187,7 +197,8 @@ const SPRAWOPOLIS: GameVariation = {
           cells: [
             [cell('commercial', ROADS.HORIZONTAL), cell('commercial', ROADS.HORIZONTAL)],
             [cell('park'), cell('park')]
-          ]
+          ],
+          scoringConditionId: 'spr-beach-002-pier'
         }
       ]
     }
@@ -219,7 +230,8 @@ const AGROPOLIS: GameVariation = {
       cells: [
         [cell('park'), cell('park')],
         [cell('park'), cell('residential')]
-      ]
+      ],
+      scoringConditionId: 'agr-001-farmland'
     },
     {
       id: 'agr-002',
@@ -228,7 +240,8 @@ const AGROPOLIS: GameVariation = {
       cells: [
         [cell('industrial'), cell('park')],
         [cell('park'), cell('park')]
-      ]
+      ],
+      scoringConditionId: 'agr-002-barn-complex'
     },
     {
       id: 'agr-003',
@@ -237,7 +250,8 @@ const AGROPOLIS: GameVariation = {
       cells: [
         [cell('commercial', ROADS.L_TOP_RIGHT), cell('residential')],
         [cell('park'), cell('park')]
-      ]
+      ],
+      scoringConditionId: 'agr-003-country-store'
     },
     {
       id: 'agr-004',
@@ -246,7 +260,8 @@ const AGROPOLIS: GameVariation = {
       cells: [
         [cell('park', ROADS.HORIZONTAL), cell('park', ROADS.HORIZONTAL)],
         [cell('residential'), cell('park')]
-      ]
+      ],
+      scoringConditionId: 'agr-004-rural-road'
     }
   ],
   expansions: []

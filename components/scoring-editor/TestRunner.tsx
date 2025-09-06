@@ -10,10 +10,14 @@ const SAMPLE_BOARD_STATES: TestCase[] = [
     name: 'Empty Board',
     description: 'No cards placed',
     boardState: {
-      cards: [],
-      currentScore: 0,
-      targetScore: 0,
-      scoring: { conditions: [], targetScore: 0 },
+      players: [],
+      currentPlayerIndex: 0,
+      deck: [],
+      board: [],
+      topCard: null,
+      gamePhase: 'playing' as const,
+      turnCount: 0,
+      scoring: { activeConditions: [], targetScore: 0 },
     } as GameState,
     expectedScore: 0,
   },
@@ -22,24 +26,25 @@ const SAMPLE_BOARD_STATES: TestCase[] = [
     name: 'Simple Layout',
     description: 'Basic 2x2 mixed development',
     boardState: {
-      cards: [
+      players: [],
+      currentPlayerIndex: 0,
+      deck: [],
+      board: [
         {
-          definition: {
-            id: 'test_card_1',
-            cells: [
-              [{ type: 'residential', roads: [] }, { type: 'commercial', roads: [] }],
-              [{ type: 'park', roads: [] }, { type: 'industrial', roads: [] }],
-            ],
-            count: 1,
-          },
+          id: 'test_card_1',
+          cells: [
+            [{ type: 'residential', roads: [] }, { type: 'commercial', roads: [] }],
+            [{ type: 'park', roads: [] }, { type: 'industrial', roads: [] }],
+          ],
           x: 0,
           y: 0,
           rotation: 0,
         },
       ],
-      currentScore: 0,
-      targetScore: 50,
-      scoring: { conditions: [], targetScore: 50 },
+      topCard: null,
+      gamePhase: 'playing' as const,
+      turnCount: 0,
+      scoring: { activeConditions: [], targetScore: 50 },
     } as GameState,
   },
   {
@@ -47,37 +52,35 @@ const SAMPLE_BOARD_STATES: TestCase[] = [
     name: 'Large Development',
     description: 'Multiple cards with roads',
     boardState: {
-      cards: [
+      players: [],
+      currentPlayerIndex: 0,
+      deck: [],
+      board: [
         {
-          definition: {
-            id: 'test_card_2',
-            cells: [
-              [{ type: 'residential', roads: ['top', 'right'] }, { type: 'residential', roads: ['left', 'bottom'] }],
-              [{ type: 'commercial', roads: ['top'] }, { type: 'commercial', roads: ['right'] }],
-            ],
-            count: 1,
-          },
+          id: 'test_card_2',
+          cells: [
+            [{ type: 'residential', roads: [[0, 1]] }, { type: 'residential', roads: [[3, 2]] }],
+            [{ type: 'commercial', roads: [[0]] }, { type: 'commercial', roads: [[1]] }],
+          ],
           x: 0,
           y: 0,
           rotation: 0,
         },
         {
-          definition: {
-            id: 'test_card_3',
-            cells: [
-              [{ type: 'park', roads: [] }, { type: 'industrial', roads: ['bottom'] }],
-              [{ type: 'industrial', roads: ['top', 'right'] }, { type: 'park', roads: ['left'] }],
-            ],
-            count: 1,
-          },
+          id: 'test_card_3',
+          cells: [
+            [{ type: 'park', roads: [] }, { type: 'industrial', roads: [[2]] }],
+            [{ type: 'industrial', roads: [[0, 1]] }, { type: 'park', roads: [[3]] }],
+          ],
           x: 2,
           y: 0,
           rotation: 0,
         },
       ],
-      currentScore: 0,
-      targetScore: 100,
-      scoring: { conditions: [], targetScore: 100 },
+      topCard: null,
+      gamePhase: 'playing' as const,
+      turnCount: 0,
+      scoring: { activeConditions: [], targetScore: 100 },
     } as GameState,
   },
 ];
@@ -233,7 +236,7 @@ export function TestRunner() {
                             {result.details.map((detail, i) => (
                               <li key={i} className="flex justify-between">
                                 <span>{detail.description}</span>
-                                <span>{detail.score} pts</span>
+                                <span>{detail.points} pts</span>
                               </li>
                             ))}
                           </ul>
