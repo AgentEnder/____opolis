@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Type check
+        run: pnpm nx typecheck blank-opolis
+
+      - name: Build
+        run: pnpm nx build blank-opolis
+
+      - name: Test
+        run: pnpm nx test blank-opolis
