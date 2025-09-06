@@ -148,13 +148,13 @@ export class DeckAnalyzer {
     }
 
     // Estimate scoring potential based on target contributions
-    const contributions = scoringConditions.map(condition => condition.targetContribution);
-    const totalContribution = contributions.reduce((sum, contrib) => sum + contrib, 0);
+    const contributions = scoringConditions.map(condition => condition.targetContribution || 0);
+    const totalContribution = contributions.reduce((sum, contrib) => (sum || 0) + (contrib || 0), 0);
     
     return {
-      min: Math.round(totalContribution * 0.3), // Assume 30% minimum achievement
-      max: Math.round(totalContribution * 1.5), // Allow for synergistic scoring
-      average: Math.round(totalContribution * 0.8), // Assume 80% average achievement
+      min: Math.round((totalContribution || 0) * 0.3), // Assume 30% minimum achievement
+      max: Math.round((totalContribution || 0) * 1.5), // Allow for synergistic scoring
+      average: Math.round((totalContribution || 0) * 0.8), // Assume 80% average achievement
     };
   }
 

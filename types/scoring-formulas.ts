@@ -29,6 +29,7 @@ export interface TestCase {
   description?: string;
 }
 
+
 // Editor state
 export interface FormulaEditorState {
   formula: string;

@@ -5,7 +5,7 @@ import type { GameState, TileData } from "./game";
 import type { ScoringDetail, Cluster, RoadNetwork } from "./scoring";
 
 // Main scoring context interface available to custom formulas
-declare interface ScoringContext {
+export declare interface ScoringContext {
   // Current game state
   gameState: GameState;
   roads: Array<RoadNetwork>;

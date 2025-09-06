@@ -7,8 +7,11 @@ import {
   Player,
 } from "../types/game";
 import { GameVariation, CardDefinition, CustomDeck, GAME_VARIATIONS } from "../types/deck";
-import { getRandomScoringConditions, SCORING_CONDITIONS } from "./scoringConditions";
+import { SCORING_CONDITIONS } from "./scoringConditions";
 import { calculateScore } from "./scoring";
+import { customScoringEngine } from "./customScoringEngine";
+import { ScoringCondition } from "../types/scoring";
+import { CustomScoringCondition } from '../types/scoring-formulas';
 
 const CARD_WIDTH = 2;
 const CARD_HEIGHT = 2;
@@ -107,13 +110,15 @@ export const generateDeckFromVariations = (
     // Add base cards from this variation
     for (const cardDef of variation.baseCards) {
       for (let i = 0; i < cardDef.count; i++) {
-        deck.push({
+        const card: Card = {
           id: `${cardDef.id}-${i}`,
           x: 0,
           y: 0,
           cells: cardDef.cells,
           rotation: 0,
-        });
+        };
+        
+        deck.push(card);
       }
     }
 
@@ -124,13 +129,15 @@ export const generateDeckFromVariations = (
         if (expansion) {
           for (const cardDef of expansion.cards) {
             for (let i = 0; i < cardDef.count; i++) {
-              deck.push({
+              const card: Card = {
                 id: `${cardDef.id}-${i}`,
                 x: 0,
                 y: 0,
                 cells: cardDef.cells,
                 rotation: 0,
-              });
+              };
+              
+              deck.push(card);
             }
           }
         }
@@ -308,10 +315,90 @@ export const initializeGame = (
   // Get the top card (public)
   const topCard = deck.length > 0 ? deck[deck.length - 1] : null;
 
-  // Set up scoring conditions - pick 3 random conditions for this game
-  const activeConditions = getRandomScoringConditions(3);
-  const targetScore = activeConditions.reduce((sum, condition) => 
+  // Set up scoring conditions - only use card-based and global conditions
+  let cardBasedConditions: ScoringCondition[] = [];
+  let globalConditions: ScoringCondition[] = [];
+  let targetScore = 0;
+
+  // Collect scoring conditions from card definitions in the deck
+  const cardScoringConditionIds = new Set<string>();
+  
+  // Extract scoring condition IDs from all cards in all variations
+  for (const variation of gameVariations) {
+    // Check base cards
+    for (const cardDef of variation.baseCards) {
+      if (cardDef.scoringConditionId) {
+        cardScoringConditionIds.add(cardDef.scoringConditionId);
+      }
+    }
+    
+    // Check expansion cards (only for preset variations)
+    if (variation.type !== 'custom' && selectedExpansions.length > 0) {
+      for (const expansionId of selectedExpansions) {
+        const expansion = variation.expansions.find(e => e.id === expansionId);
+        if (expansion) {
+          for (const cardDef of expansion.cards) {
+            if (cardDef.scoringConditionId) {
+              cardScoringConditionIds.add(cardDef.scoringConditionId);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Get custom decks for global conditions
+  const customDecks = gameVariations.filter(v => 'isCustom' in v && v.isCustom) as CustomDeck[];
+  
+  // Process custom scoring conditions from custom decks
+  for (const deck of customDecks) {
+    if (deck.customScoringConditions) {
+      for (const cond of deck.customScoringConditions) {
+        const scoringCondition: ScoringCondition = {
+          id: cond.id,
+          name: cond.name,
+          description: cond.description,
+          targetContribution: cond.targetContribution || 0,
+          evaluate: (_board: Card[]) => {
+            // This will be handled by the custom scoring engine
+            // Actual evaluation happens in the scoring calculation
+            return 0;
+          }
+        };
+
+        if (cond.isGlobal) {
+          // Global conditions are always active and don't count towards the 3-card limit
+          globalConditions.push(scoringCondition);
+        } else if (cardScoringConditionIds.has(cond.id)) {
+          // Only include non-global conditions that are referenced by cards
+          cardBasedConditions.push(scoringCondition);
+        }
+      }
+    }
+  }
+
+  // For built-in conditions, check if any cards reference them
+  for (const conditionId of cardScoringConditionIds) {
+    const builtInCondition = SCORING_CONDITIONS[conditionId];
+    if (builtInCondition && !cardBasedConditions.some(c => c.id === conditionId)) {
+      cardBasedConditions.push(builtInCondition);
+    }
+  }
+
+  // Limit card-based conditions to 3 (not including global conditions)
+  const selectedCardBasedConditions = cardBasedConditions.slice(0, 3);
+  
+  // Combine global and card-based conditions
+  const activeConditions = [...globalConditions, ...selectedCardBasedConditions];
+
+  targetScore = activeConditions.reduce((sum, condition) => 
     sum + (condition.targetContribution || 0), 0);
+
+  // Pre-compile custom conditions for better performance
+  const customConditions = customDecks.flatMap(deck => deck.customScoringConditions || []);
+  if (customConditions.length > 0) {
+    customScoringEngine.precompileConditions(customConditions).catch(console.error);
+  }
 
   return {
     players,
@@ -319,7 +406,7 @@ export const initializeGame = (
     deck,
     board: [firstCard],
     topCard,
-    gamePhase: "playing",
+    gamePhase: "playing" as const,
     turnCount: 0,
     scoring: {
       activeConditions: activeConditions.map(c => ({
@@ -327,7 +414,8 @@ export const initializeGame = (
         name: c.name,
         description: c.description
       })),
-      targetScore
+      targetScore,
+      customConditions: customConditions as any[] // Store for scoring calculations
     },
   };
 };
@@ -366,7 +454,6 @@ export const playCard = (
 
   // Pass remaining cards to next player
   const nextPlayerIndex = (playerIndex + 1) % gameState.players.length;
-  const nextPlayer = gameState.players[nextPlayerIndex];
 
   // Create new players array with updated hands
   const newPlayers = gameState.players.map((p, idx) => {
@@ -429,9 +516,39 @@ export const getCurrentScore = (gameState: GameState) => {
   }
   
   // Get the actual scoring condition functions
-  const activeConditions = gameState.scoring.activeConditions.map(conditionInfo => {
-    return SCORING_CONDITIONS[conditionInfo.id];
-  }).filter(Boolean); // Remove any undefined conditions
+  const builtInConditions = gameState.scoring.activeConditions
+    .map(conditionInfo => SCORING_CONDITIONS[conditionInfo.id])
+    .filter(Boolean); // Remove any undefined conditions
   
-  return calculateScore(gameState.board, activeConditions);
+  // Handle custom scoring conditions
+  const customConditions: ScoringCondition[] = [];
+  if (gameState.scoring.customConditions && gameState.scoring.customConditions.length > 0) {
+    // Convert custom conditions to ScoringCondition format
+    gameState.scoring.customConditions.forEach(cond => {
+      if (gameState.scoring?.activeConditions.some(ac => ac.id === cond.id)) {
+        customConditions.push({
+          id: cond.id,
+          name: cond.name,
+          description: cond.description,
+          targetContribution: cond.targetContribution || 0,
+          evaluate: (board: Card[]) => {
+            // Simplified synchronous evaluation for now
+            // In production, this would be handled asynchronously
+            try {
+              const context = customScoringEngine['createScoringContext'](board);
+              const formula = customScoringEngine['createSafeFormula'](cond.formula);
+              return formula(context);
+            } catch {
+              return 0;
+            }
+          }
+        });
+      }
+    });
+  }
+  
+  // Combine built-in and custom conditions
+  const allConditions = [...builtInConditions, ...customConditions];
+  
+  return calculateScore(gameState.board, allConditions);
 };

@@ -111,10 +111,8 @@ class ScoringSandbox {
       gamePhase: gameState.gamePhase || 'ended',
       topCard: gameState.topCard || null,
       turnCount: gameState.turnCount || 0,
-      currentScore: gameState.currentScore || 0,
-      targetScore: gameState.targetScore || 0,
       scoring: {
-        conditions: gameState.scoring?.conditions || [],
+        activeConditions: gameState.scoring?.activeConditions || [],
         targetScore: gameState.scoring?.targetScore || 0,
       },
     };

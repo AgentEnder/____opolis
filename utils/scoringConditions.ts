@@ -7,7 +7,488 @@ import { Card, CellType } from '../types/game';
 // Example scoring conditions that might appear on cards
 
 export const SCORING_CONDITIONS: Record<string, ScoringCondition> = {
-  // Residential scoring variations
+  // Sprawopolis Card-Specific Conditions
+  'spr-001-residential-block': {
+    id: 'spr-001-residential-block',
+    name: 'Block Party',
+    description: '+1 point for each residential tile in your largest residential group',
+    targetContribution: 6,
+    evaluate: (board: Card[]) => {
+      const clusters = findClusters(board);
+      const residentialClusters = clusters.filter(c => c.type === 'residential');
+      if (residentialClusters.length === 0) return 0;
+      const largest = residentialClusters.reduce((max, cluster) => 
+        cluster.size > max.size ? cluster : max
+      );
+      return largest.size;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const clusters = findClusters(board);
+      const residentialClusters = clusters.filter(c => c.type === 'residential');
+      if (residentialClusters.length === 0) {
+        return { points: 0, relevantTiles: [], description: 'No residential areas' };
+      }
+      const largest = residentialClusters.reduce((max, cluster) => 
+        cluster.size > max.size ? cluster : max
+      );
+      return {
+        points: largest.size,
+        relevantTiles: largest.tiles.map(t => ({ x: t.x, y: t.y })),
+        description: `Largest residential block: ${largest.size} tiles`
+      };
+    }
+  },
+
+  'spr-002-suburb': {
+    id: 'spr-002-suburb',
+    name: 'Suburban Sprawl',
+    description: '+2 points for each residential tile connected by roads',
+    targetContribution: 8,
+    evaluate: (board: Card[]) => {
+      const tiles = getAllTiles(board);
+      const residentialWithRoads = tiles.filter(t => 
+        t.type === 'residential' && t.roads && t.roads.length > 0
+      );
+      return residentialWithRoads.length * 2;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const tiles = getAllTiles(board);
+      const residentialWithRoads = tiles.filter(t => 
+        t.type === 'residential' && t.roads && t.roads.length > 0
+      );
+      return {
+        points: residentialWithRoads.length * 2,
+        relevantTiles: residentialWithRoads.map(t => ({ x: t.x, y: t.y })),
+        description: `${residentialWithRoads.length} residential tiles with roads × 2`
+      };
+    }
+  },
+
+  'spr-003-shopping-district': {
+    id: 'spr-003-shopping-district',
+    name: 'Shopping Spree',
+    description: '+3 points for each group of 3+ commercial tiles',
+    targetContribution: 9,
+    evaluate: (board: Card[]) => {
+      const clusters = findClusters(board);
+      const commercialClusters = clusters.filter(c => c.type === 'commercial' && c.size >= 3);
+      return commercialClusters.length * 3;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const clusters = findClusters(board);
+      const commercialClusters = clusters.filter(c => c.type === 'commercial' && c.size >= 3);
+      const relevantTiles: Array<{ x: number; y: number }> = [];
+      for (const cluster of commercialClusters) {
+        for (const tile of cluster.tiles) {
+          relevantTiles.push({ x: tile.x, y: tile.y });
+        }
+      }
+      return {
+        points: commercialClusters.length * 3,
+        relevantTiles,
+        description: `${commercialClusters.length} commercial groups (3+ tiles) × 3`
+      };
+    }
+  },
+
+  'spr-004-main-street': {
+    id: 'spr-004-main-street',
+    name: 'Main Street',
+    description: '+1 point for each commercial tile with roads',
+    targetContribution: 5,
+    evaluate: (board: Card[]) => {
+      const tiles = getAllTiles(board);
+      return tiles.filter(t => t.type === 'commercial' && t.roads && t.roads.length > 0).length;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const tiles = getAllTiles(board);
+      const commercialWithRoads = tiles.filter(t => 
+        t.type === 'commercial' && t.roads && t.roads.length > 0
+      );
+      return {
+        points: commercialWithRoads.length,
+        relevantTiles: commercialWithRoads.map(t => ({ x: t.x, y: t.y })),
+        description: `${commercialWithRoads.length} commercial tiles with roads`
+      };
+    }
+  },
+
+  'spr-005-factory-district': {
+    id: 'spr-005-factory-district',
+    name: 'Industrial Complex',
+    description: '+4 points for each group of 3+ industrial tiles',
+    targetContribution: 8,
+    evaluate: (board: Card[]) => {
+      const clusters = findClusters(board);
+      const industrialClusters = clusters.filter(c => c.type === 'industrial' && c.size >= 3);
+      return industrialClusters.length * 4;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const clusters = findClusters(board);
+      const industrialClusters = clusters.filter(c => c.type === 'industrial' && c.size >= 3);
+      const relevantTiles: Array<{ x: number; y: number }> = [];
+      for (const cluster of industrialClusters) {
+        for (const tile of cluster.tiles) {
+          relevantTiles.push({ x: tile.x, y: tile.y });
+        }
+      }
+      return {
+        points: industrialClusters.length * 4,
+        relevantTiles,
+        description: `${industrialClusters.length} industrial groups (3+ tiles) × 4`
+      };
+    }
+  },
+
+  'spr-006-warehouse': {
+    id: 'spr-006-warehouse',
+    name: 'Logistics Hub',
+    description: '+2 points for each industrial tile adjacent to commercial',
+    targetContribution: 6,
+    evaluate: (board: Card[]) => {
+      const tiles = getAllTiles(board);
+      const industrialTiles = tiles.filter(t => t.type === 'industrial');
+      const commercialTiles = tiles.filter(t => t.type === 'commercial');
+      
+      let points = 0;
+      for (const indTile of industrialTiles) {
+        const hasAdjacentCommercial = commercialTiles.some(commTile => {
+          const dx = Math.abs(indTile.x - commTile.x);
+          const dy = Math.abs(indTile.y - commTile.y);
+          return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+        });
+        if (hasAdjacentCommercial) points += 2;
+      }
+      return points;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const tiles = getAllTiles(board);
+      const industrialTiles = tiles.filter(t => t.type === 'industrial');
+      const commercialTiles = tiles.filter(t => t.type === 'commercial');
+      const relevantTiles: Array<{ x: number; y: number }> = [];
+      
+      let count = 0;
+      for (const indTile of industrialTiles) {
+        const hasAdjacentCommercial = commercialTiles.some(commTile => {
+          const dx = Math.abs(indTile.x - commTile.x);
+          const dy = Math.abs(indTile.y - commTile.y);
+          return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+        });
+        if (hasAdjacentCommercial) {
+          count++;
+          relevantTiles.push({ x: indTile.x, y: indTile.y });
+        }
+      }
+      return {
+        points: count * 2,
+        relevantTiles,
+        description: `${count} industrial tiles adjacent to commercial × 2`
+      };
+    }
+  },
+
+  'spr-007-mixed-use': {
+    id: 'spr-007-mixed-use',
+    name: 'Mixed Development',
+    description: '+5 points if you have at least 2 tiles of each zone type',
+    targetContribution: 5,
+    evaluate: (board: Card[]) => {
+      const tiles = getAllTiles(board);
+      const typeCounts: Record<string, number> = {};
+      
+      for (const tile of tiles) {
+        typeCounts[tile.type] = (typeCounts[tile.type] || 0) + 1;
+      }
+      
+      const zoneTypes = ['residential', 'commercial', 'industrial', 'park'];
+      const hasAllTypes = zoneTypes.every(type => (typeCounts[type] || 0) >= 2);
+      return hasAllTypes ? 5 : 0;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const tiles = getAllTiles(board);
+      const typeCounts: Record<string, number> = {};
+      
+      for (const tile of tiles) {
+        typeCounts[tile.type] = (typeCounts[tile.type] || 0) + 1;
+      }
+      
+      const zoneTypes = ['residential', 'commercial', 'industrial', 'park'];
+      const hasAllTypes = zoneTypes.every(type => (typeCounts[type] || 0) >= 2);
+      
+      return {
+        points: hasAllTypes ? 5 : 0,
+        relevantTiles: hasAllTypes ? tiles.map(t => ({ x: t.x, y: t.y })) : [],
+        description: hasAllTypes 
+          ? `Mixed development achieved (2+ of each zone)`
+          : `Need 2+ of each zone: ${zoneTypes.map(t => `${t}:${typeCounts[t] || 0}`).join(', ')}`
+      };
+    }
+  },
+
+  'spr-008-intersection': {
+    id: 'spr-008-intersection',
+    name: 'Traffic Flow',
+    description: '-1 point per road network (reduced penalty)',
+    targetContribution: 3,
+    evaluate: (board: Card[]) => {
+      const roadNetworks = findRoadNetworks(board);
+      // Instead of -1 per network, this makes it a reduced penalty
+      return Math.max(0, 3 - roadNetworks.length);
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const roadNetworks = findRoadNetworks(board);
+      const points = Math.max(0, 3 - roadNetworks.length);
+      const relevantTiles: Array<{ x: number; y: number }> = [];
+      
+      for (const network of roadNetworks) {
+        for (const segment of network.segments) {
+          if (!relevantTiles.some(t => t.x === segment.x && t.y === segment.y)) {
+            relevantTiles.push({ x: segment.x, y: segment.y });
+          }
+        }
+      }
+      
+      return {
+        points,
+        relevantTiles,
+        description: `${roadNetworks.length} road networks: ${points} points`
+      };
+    }
+  },
+
+  // Agropolis Card-Specific Conditions
+  'agr-001-farmland': {
+    id: 'agr-001-farmland',
+    name: 'Green Acres',
+    description: '+2 points for each park tile in your largest park group',
+    targetContribution: 8,
+    evaluate: (board: Card[]) => {
+      const clusters = findClusters(board);
+      const parkClusters = clusters.filter(c => c.type === 'park');
+      if (parkClusters.length === 0) return 0;
+      const largest = parkClusters.reduce((max, cluster) => 
+        cluster.size > max.size ? cluster : max
+      );
+      return largest.size * 2;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const clusters = findClusters(board);
+      const parkClusters = clusters.filter(c => c.type === 'park');
+      if (parkClusters.length === 0) {
+        return { points: 0, relevantTiles: [], description: 'No park areas' };
+      }
+      const largest = parkClusters.reduce((max, cluster) => 
+        cluster.size > max.size ? cluster : max
+      );
+      return {
+        points: largest.size * 2,
+        relevantTiles: largest.tiles.map(t => ({ x: t.x, y: t.y })),
+        description: `Largest park group: ${largest.size} tiles × 2`
+      };
+    }
+  },
+
+  'agr-002-barn-complex': {
+    id: 'agr-002-barn-complex',
+    name: 'Farm Buildings',
+    description: '+3 points for each industrial tile adjacent to 2+ park tiles',
+    targetContribution: 9,
+    evaluate: (board: Card[]) => {
+      const tiles = getAllTiles(board);
+      const industrialTiles = tiles.filter(t => t.type === 'industrial');
+      const parkTiles = tiles.filter(t => t.type === 'park');
+      
+      let points = 0;
+      for (const indTile of industrialTiles) {
+        const adjacentParks = parkTiles.filter(parkTile => {
+          const dx = Math.abs(indTile.x - parkTile.x);
+          const dy = Math.abs(indTile.y - parkTile.y);
+          return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+        });
+        if (adjacentParks.length >= 2) points += 3;
+      }
+      return points;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const tiles = getAllTiles(board);
+      const industrialTiles = tiles.filter(t => t.type === 'industrial');
+      const parkTiles = tiles.filter(t => t.type === 'park');
+      const relevantTiles: Array<{ x: number; y: number }> = [];
+      
+      let count = 0;
+      for (const indTile of industrialTiles) {
+        const adjacentParks = parkTiles.filter(parkTile => {
+          const dx = Math.abs(indTile.x - parkTile.x);
+          const dy = Math.abs(indTile.y - parkTile.y);
+          return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+        });
+        if (adjacentParks.length >= 2) {
+          count++;
+          relevantTiles.push({ x: indTile.x, y: indTile.y });
+        }
+      }
+      return {
+        points: count * 3,
+        relevantTiles,
+        description: `${count} industrial tiles adjacent to 2+ parks × 3`
+      };
+    }
+  },
+
+  'agr-003-country-store': {
+    id: 'agr-003-country-store',
+    name: 'Country Commerce',
+    description: '+4 points for each commercial tile with roads adjacent to residential',
+    targetContribution: 8,
+    evaluate: (board: Card[]) => {
+      const tiles = getAllTiles(board);
+      const commercialTiles = tiles.filter(t => t.type === 'commercial' && t.roads && t.roads.length > 0);
+      const residentialTiles = tiles.filter(t => t.type === 'residential');
+      
+      let points = 0;
+      for (const commTile of commercialTiles) {
+        const hasAdjacentResidential = residentialTiles.some(resTile => {
+          const dx = Math.abs(commTile.x - resTile.x);
+          const dy = Math.abs(commTile.y - resTile.y);
+          return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+        });
+        if (hasAdjacentResidential) points += 4;
+      }
+      return points;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const tiles = getAllTiles(board);
+      const commercialTiles = tiles.filter(t => t.type === 'commercial' && t.roads && t.roads.length > 0);
+      const residentialTiles = tiles.filter(t => t.type === 'residential');
+      const relevantTiles: Array<{ x: number; y: number }> = [];
+      
+      let count = 0;
+      for (const commTile of commercialTiles) {
+        const hasAdjacentResidential = residentialTiles.some(resTile => {
+          const dx = Math.abs(commTile.x - resTile.x);
+          const dy = Math.abs(commTile.y - resTile.y);
+          return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+        });
+        if (hasAdjacentResidential) {
+          count++;
+          relevantTiles.push({ x: commTile.x, y: commTile.y });
+        }
+      }
+      return {
+        points: count * 4,
+        relevantTiles,
+        description: `${count} commercial tiles with roads adjacent to residential × 4`
+      };
+    }
+  },
+
+  'agr-004-rural-road': {
+    id: 'agr-004-rural-road',
+    name: 'Rural Connections',
+    description: '+1 point for each park tile connected by roads',
+    targetContribution: 6,
+    evaluate: (board: Card[]) => {
+      const tiles = getAllTiles(board);
+      const parkWithRoads = tiles.filter(t => 
+        t.type === 'park' && t.roads && t.roads.length > 0
+      );
+      return parkWithRoads.length;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const tiles = getAllTiles(board);
+      const parkWithRoads = tiles.filter(t => 
+        t.type === 'park' && t.roads && t.roads.length > 0
+      );
+      return {
+        points: parkWithRoads.length,
+        relevantTiles: parkWithRoads.map(t => ({ x: t.x, y: t.y })),
+        description: `${parkWithRoads.length} park tiles with roads`
+      };
+    }
+  },
+
+  // Sprawopolis Expansion Conditions
+  'spr-beach-001-beachfront': {
+    id: 'spr-beach-001-beachfront',
+    name: 'Coastal Paradise',
+    description: '+3 points for each park tile adjacent to residential or commercial',
+    targetContribution: 9,
+    evaluate: (board: Card[]) => {
+      const tiles = getAllTiles(board);
+      const parkTiles = tiles.filter(t => t.type === 'park');
+      const buildingTiles = tiles.filter(t => t.type === 'residential' || t.type === 'commercial');
+      
+      let points = 0;
+      for (const parkTile of parkTiles) {
+        const hasAdjacentBuilding = buildingTiles.some(buildingTile => {
+          const dx = Math.abs(parkTile.x - buildingTile.x);
+          const dy = Math.abs(parkTile.y - buildingTile.y);
+          return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+        });
+        if (hasAdjacentBuilding) points += 3;
+      }
+      return points;
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const tiles = getAllTiles(board);
+      const parkTiles = tiles.filter(t => t.type === 'park');
+      const buildingTiles = tiles.filter(t => t.type === 'residential' || t.type === 'commercial');
+      const relevantTiles: Array<{ x: number; y: number }> = [];
+      
+      let count = 0;
+      for (const parkTile of parkTiles) {
+        const hasAdjacentBuilding = buildingTiles.some(buildingTile => {
+          const dx = Math.abs(parkTile.x - buildingTile.x);
+          const dy = Math.abs(parkTile.y - buildingTile.y);
+          return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+        });
+        if (hasAdjacentBuilding) {
+          count++;
+          relevantTiles.push({ x: parkTile.x, y: parkTile.y });
+        }
+      }
+      return {
+        points: count * 3,
+        relevantTiles,
+        description: `${count} park tiles adjacent to buildings × 3`
+      };
+    }
+  },
+
+  'spr-beach-002-pier': {
+    id: 'spr-beach-002-pier',
+    name: 'Waterfront Commerce',
+    description: '+5 points for each commercial tile in a group of 4+ commercial tiles',
+    targetContribution: 10,
+    evaluate: (board: Card[]) => {
+      const clusters = findClusters(board);
+      const commercialClusters = clusters.filter(c => c.type === 'commercial' && c.size >= 4);
+      return commercialClusters.reduce((sum, cluster) => sum + cluster.size * 5, 0);
+    },
+    evaluateWithDetails: (board: Card[]): ScoringDetail => {
+      const clusters = findClusters(board);
+      const commercialClusters = clusters.filter(c => c.type === 'commercial' && c.size >= 4);
+      const relevantTiles: Array<{ x: number; y: number }> = [];
+      let totalPoints = 0;
+      
+      for (const cluster of commercialClusters) {
+        totalPoints += cluster.size * 5;
+        for (const tile of cluster.tiles) {
+          relevantTiles.push({ x: tile.x, y: tile.y });
+        }
+      }
+      
+      return {
+        points: totalPoints,
+        relevantTiles,
+        description: commercialClusters.length > 0 
+          ? `${commercialClusters.map(c => c.size).join('+')} commercial tiles in large groups × 5`
+          : 'No commercial groups of 4+'
+      };
+    }
+  },
+
+  // Original scoring conditions (kept for compatibility)
   'residential-groups': {
     id: 'residential-groups',
     name: 'Residential Groups',

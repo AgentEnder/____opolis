@@ -7,6 +7,15 @@ export interface ScoringDetail {
   description?: string;
 }
 
+export interface ConditionScore {
+  condition: ScoringCondition;
+  points: number;
+  fromCache?: boolean;
+  executionTime?: number;
+  error?: string;
+  details?: ScoringDetail;
+}
+
 // Scoring condition that can be applied to evaluate a board state
 export interface ScoringCondition {
   id: string;
