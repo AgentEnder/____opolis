@@ -115,10 +115,10 @@ export class RuleTester {
         details: executionResult.details
           ? {
               description: `${rule.name}: ${executionResult.score} points`,
-              breakdown: executionResult.details.map((detail) => ({
+              breakdown: executionResult.details.map((detail: any) => ({
                 description: detail.description || "Scoring calculation",
                 points: detail.points || 0,
-                tiles: (detail.relevantTiles || []).map((tile) => ({
+                tiles: (detail.relevantTiles || []).map((tile: any) => ({
                   row: tile.y,
                   col: tile.x,
                 })),
@@ -177,7 +177,6 @@ export class RuleTester {
           y: row * 3,
           cells: cardDef.cells,
           rotation: 0,
-          customMetadata: cardDef.customMetadata,
         });
 
         cardsPlaced++;
@@ -201,7 +200,6 @@ export class RuleTester {
       y: position.y,
       cells: cardDefinition.cells,
       rotation: 0,
-      customMetadata: cardDefinition.customMetadata,
     };
 
     // Check if there's already a card at this position
@@ -303,7 +301,6 @@ export class RuleTester {
             y: 0,
             cells: firstCard.cells,
             rotation: 0,
-            customMetadata: firstCard.customMetadata,
           },
         ],
         suggestedRules: [],
@@ -321,7 +318,6 @@ export class RuleTester {
           y: Math.floor(i / 2) * 3,
           cells: cardDef.cells,
           rotation: 0,
-          customMetadata: cardDef.customMetadata,
         });
       }
 

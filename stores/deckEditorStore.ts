@@ -32,7 +32,8 @@ interface DeckEditorStore extends DeckEditorState {
   // Card management
   addCardToDeck: (card: CardDefinition) => void;
   updateCardInDeck: (index: number, card: CardDefinition) => void;
-  updateCardMetadata: (index: number, metadata: CustomMetadata) => void;
+  updateZoneMetadata: (cardIndex: number, zoneRow: number, zoneCol: number, metadata: CustomMetadata) => void;
+  updateZoneTypeDefaultMetadata: (zoneTypeId: string, metadata: CustomMetadata) => void;
   removeCardFromDeck: (index: number) => void;
   duplicateCardInDeck: (index: number) => void;
   
@@ -176,19 +177,53 @@ export const useDeckEditorStore = create<DeckEditorStore>((set, get) => ({
     });
   },
 
-  updateCardMetadata: (index, metadata) => {
+  updateZoneMetadata: (cardIndex, zoneRow, zoneCol, metadata) => {
     const { currentDeck } = get();
-    if (!currentDeck || index < 0 || index >= currentDeck.baseCards.length) return;
+    if (!currentDeck || cardIndex < 0 || cardIndex >= currentDeck.baseCards.length) return;
+    
+    const card = currentDeck.baseCards[cardIndex];
+    if (!card.cells[zoneRow] || !card.cells[zoneRow][zoneCol]) return;
 
     const updatedCards = [...currentDeck.baseCards];
-    updatedCards[index] = {
-      ...updatedCards[index],
-      customMetadata: metadata,
-    };
+    const updatedCard = { ...card };
+    updatedCard.cells = card.cells.map((row, rowIdx) => {
+      if (rowIdx !== zoneRow) return row;
+      return row.map((cell, colIdx) => {
+        if (colIdx !== zoneCol) return cell;
+        return { ...cell, customMetadata: metadata };
+      });
+    });
+    
+    updatedCards[cardIndex] = updatedCard;
 
     const updatedDeck: CustomDeck = {
       ...currentDeck,
       baseCards: updatedCards,
+      metadata: {
+        ...currentDeck.metadata,
+        modified: new Date(),
+      },
+    };
+
+    set({ 
+      currentDeck: updatedDeck,
+      hasUnsavedChanges: true,
+    });
+  },
+
+  updateZoneTypeDefaultMetadata: (zoneTypeId, metadata) => {
+    const { currentDeck } = get();
+    if (!currentDeck) return;
+
+    const updatedZoneTypes = currentDeck.zoneTypes.map(zoneType =>
+      zoneType.id === zoneTypeId
+        ? { ...zoneType, defaultMetadata: metadata }
+        : zoneType
+    );
+
+    const updatedDeck: CustomDeck = {
+      ...currentDeck,
+      zoneTypes: updatedZoneTypes,
       metadata: {
         ...currentDeck.metadata,
         modified: new Date(),

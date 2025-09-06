@@ -96,7 +96,7 @@ describe('Scoring Conditions Details', () => {
       const result = condition.evaluateWithDetails!(board);
       
       // Description should be non-empty and contain useful info
-      expect(result.description.length).toBeGreaterThan(0);
+      expect(result.description?.length || 0).toBeGreaterThan(0);
       expect(result.description).toContain(result.points.toString());
     }
   });

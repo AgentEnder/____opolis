@@ -22,14 +22,9 @@ describe('Deck Editor Integration', () => {
           name: 'Farm Card',
           count: 3,
           cells: [
-            [{ type: 'residential', roads: [] }, { type: 'park', roads: [] }],
+            [{ type: 'residential', roads: [], customMetadata: { livestockCount: 5, cropType: 'wheat', seasonal: true } }, { type: 'park', roads: [] }],
             [{ type: 'commercial', roads: [] }, { type: 'industrial', roads: [] }]
-          ],
-          customMetadata: {
-            livestockCount: 5,
-            cropType: 'wheat',
-            seasonal: true
-          }
+          ]
         },
         {
           id: 'card-2',
@@ -51,7 +46,11 @@ describe('Deck Editor Integration', () => {
           compiledFormula: 'function calculateScore(context) { return 10; }',
           targetContribution: 20,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          isCustom: true,
+          testCases: [],
+          evaluate: () => 10,
+          evaluateWithDetails: () => ({ points: 10, relevantTiles: [], description: 'Livestock bonus' })
         }
       ],
       zoneTypes: [
@@ -233,15 +232,15 @@ describe('Deck Editor Integration', () => {
 
       expect(analysis.balance.cardCount).toBe(5);
       expect(analysis.balance.scoringPotential.max).toBeGreaterThan(0);
-      expect(testDeck.baseCards[0].customMetadata).toBeDefined();
+      expect(testDeck.baseCards[0].cells[0][0].customMetadata).toBeDefined();
       expect(testDeck.metadataSchema).toBeDefined();
     });
 
     it('should maintain data integrity across operations', () => {
       // Verify that metadata validation and deck analysis don't interfere
-      const cardWithMetadata = testDeck.baseCards[0];
+      const cellWithMetadata = testDeck.baseCards[0].cells[0][0];
       const errors = validateMetadata(
-        cardWithMetadata.customMetadata!,
+        cellWithMetadata.customMetadata!,
         testMetadataSchema.fields
       );
 

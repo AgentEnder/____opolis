@@ -55,7 +55,7 @@ describe('Scoring Editor Store', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         evaluate: () => 0,
-        evaluateWithDetails: () => ({ score: 0, tiles: [], description: '' }),
+        evaluateWithDetails: () => ({ points: 0, relevantTiles: [], description: '' }),
       };
 
       const { openEditor } = useScoringEditorStore.getState();

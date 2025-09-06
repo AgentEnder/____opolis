@@ -8,37 +8,33 @@ function createTestCard(id: string, x: number, y: number, cells: CellType[][]): 
     id,
     x,
     y,
+    rotation: 0,
     cells: cells.map((row, rowIdx) => 
       row.map((type, colIdx) => ({
         type,
         roads: [] // No roads for basic tests
       }))
-    ),
-    type: 'city' as const,
-    name: `Test Card ${id}`,
-    description: 'Test card'
+    )
   };
   return card;
 }
 
 // Helper function to create test cards with roads
-function createTestCardWithRoads(id: string, x: number, y: number, cellsWithRoads: Array<{
+function createTestCardWithRoads(id: string, x: number, y: number, cellsWithRoads: Array<Array<{
   type: CellType;
   roads?: [number, number][];
-}>[][]): Card {
+}>>): Card {
   const card: Card = {
     id,
     x,
     y,
+    rotation: 0,
     cells: cellsWithRoads.map((row, rowIdx) => 
       row.map((cell, colIdx) => ({
         type: cell.type,
         roads: cell.roads || []
       }))
-    ),
-    type: 'city' as const,
-    name: `Test Card ${id}`,
-    description: 'Test card'
+    )
   };
   return card;
 }
@@ -50,11 +46,11 @@ describe('New Scoring Conditions', () => {
         // Create a simple road network
         createTestCardWithRoads('1', 0, 0, [
           [{ type: 'residential', roads: [[1, 2]] }, { type: 'residential', roads: [[0, 3]] }],
-          [{ type: 'park' }, { type: 'commercial' }]
+          [{ type: 'park', roads: [] }, { type: 'commercial', roads: [] }]
         ]),
         createTestCardWithRoads('2', 2, 0, [
           [{ type: 'industrial', roads: [[1, 3]] }, { type: 'residential', roads: [[0, 2]] }],
-          [{ type: 'park' }, { type: 'commercial' }]
+          [{ type: 'park', roads: [] }, { type: 'commercial', roads: [] }]
         ])
       ];
 

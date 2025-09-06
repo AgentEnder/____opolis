@@ -179,7 +179,6 @@ export const useRuleTestStore = create<RuleTestStoreState>()((set, get) => {
           y: 0,
           cells: cardDef.cells,
           rotation: 0,
-          customMetadata: cardDef.customMetadata,
         })),
         scoringResults: null,
         highlightedTiles: [],

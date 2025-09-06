@@ -244,7 +244,7 @@ export const useScoringEditorStore = create<ScoringEditorStore>((set, get) => ({
       updatedAt: now,
       targetContribution,
       evaluate: () => 0, // Will be replaced with compiled function
-      evaluateWithDetails: () => ({ score: 0, tiles: [], description: '' }),
+      evaluateWithDetails: () => ({ points: 0, relevantTiles: [], description: '' }),
     };
     
     return condition;

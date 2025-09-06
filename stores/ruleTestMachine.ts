@@ -161,7 +161,6 @@ export const ruleTestMachine = setup({
             y: 0,
             cells: event.cardDef.cells,
             rotation: 0,
-            customMetadata: event.cardDef.customMetadata,
           };
         }
         return null;
@@ -190,7 +189,6 @@ export const ruleTestMachine = setup({
             y: 0,
             cells: context.selectedCardDef.cells,
             rotation: 0,
-            customMetadata: context.selectedCardDef.customMetadata,
           };
         }
         return null;

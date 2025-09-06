@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CustomDeck } from '../types/deck';
+import { migrateFullDeck, deckNeedsMigration, cleanupLegacyMetadata } from '../utils/metadataMigration';
 
 interface CustomDecksStore {
   customDecks: CustomDeck[];
@@ -120,7 +121,7 @@ export const useCustomDecksStore = create<CustomDecksStore>()(
             counter++;
           }
 
-          const newDeck: Omit<CustomDeck, 'id'> = {
+          let newDeck: Omit<CustomDeck, 'id'> = {
             name: deckName,
             description: importedData.description || 'Imported custom deck',
             type: 'custom',
@@ -143,7 +144,15 @@ export const useCustomDecksStore = create<CustomDecksStore>()(
               modified: new Date(),
               version: importedData.metadata?.version || '1.0',
             },
+            customScoringConditions: importedData.customScoringConditions || [],
+            metadataSchema: importedData.metadataSchema || undefined,
           };
+          
+          // Check if imported deck needs metadata migration
+          if (deckNeedsMigration(newDeck as CustomDeck)) {
+            const migratedDeck = migrateFullDeck(newDeck as CustomDeck);
+            newDeck = cleanupLegacyMetadata(migratedDeck);
+          }
 
           get().addDeck(newDeck);
         } catch (error) {
@@ -188,6 +197,17 @@ export const useCustomDecksStore = create<CustomDecksStore>()(
         if (deck && !deck.customScoringConditions) {
           deck.customScoringConditions = [];
         }
+        
+        // Check if deck needs metadata migration and perform it
+        if (deck && deckNeedsMigration(deck)) {
+          const migratedDeck = migrateFullDeck(deck);
+          const cleanedDeck = cleanupLegacyMetadata(migratedDeck);
+          
+          // Update the deck in storage
+          get().updateDeck(id, cleanedDeck);
+          return cleanedDeck;
+        }
+        
         return deck;
       },
     }),

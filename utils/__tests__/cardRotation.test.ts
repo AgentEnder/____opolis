@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { rotateCard, playCard, initializeGame } from '../gameLogic';
 import { Card, CellData } from '../../types/game';
+import { SPRAWOPOLIS } from '../../types/deck';
 
 describe('Card Rotation', () => {
   // Create a test card with distinct cells to verify rotation
@@ -68,7 +69,7 @@ describe('Card Rotation', () => {
 
   it('should maintain rotation when placing card through playCard', () => {
     // Initialize a game
-    const gameState = initializeGame(['Player 1'], ['sprawopolis']);
+    const gameState = initializeGame(['Player 1'], [SPRAWOPOLIS]);
     
     // Get the current player
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
@@ -97,7 +98,7 @@ describe('Card Rotation', () => {
 
   it('should trace the exact flow through playCard function', () => {
     // This test will help us understand what happens step by step
-    const gameState = initializeGame(['Player 1'], ['sprawopolis']);
+    const gameState = initializeGame(['Player 1'], [SPRAWOPOLIS]);
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     
     const testCard = createTestCard();
