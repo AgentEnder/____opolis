@@ -22,14 +22,17 @@ export class MetadataTypeGenerator {
 
     return `
 // Auto-generated metadata types for Monaco Editor
-interface CustomCardMetadata {${fields}
+interface CustomZoneMetadata {${fields}
 }
 
-// Enhanced tile interface with typed metadata
+// Enhanced cell interface with typed metadata
+interface CellWithMetadata extends CellData {
+  customMetadata?: CustomZoneMetadata;
+}
+
+// Enhanced tile interface with typed zone metadata
 interface TileWithMetadata extends Tile {
-  card?: Card & {
-    customMetadata?: CustomCardMetadata;
-  };
+  customMetadata?: CustomZoneMetadata;
 }
 
 // Enhanced context with typed metadata access
@@ -73,13 +76,16 @@ declare const context: TypedScoringContext;
   private generateEmptyTypes(): string {
     return `
 // No custom metadata defined
-interface CustomCardMetadata {}
+interface CustomZoneMetadata {}
 
-// Enhanced tile interface with typed metadata
+// Enhanced cell interface with typed metadata
+interface CellWithMetadata extends CellData {
+  customMetadata?: CustomZoneMetadata;
+}
+
+// Enhanced tile interface with typed zone metadata
 interface TileWithMetadata extends Tile {
-  card?: Card & {
-    customMetadata?: CustomCardMetadata;
-  };
+  customMetadata?: CustomZoneMetadata;
 }
 
 // Enhanced context with typed metadata access
@@ -139,12 +145,12 @@ function calculateScore(context: ScoringContext): number {
     const exampleUsage = this.generateFieldUsageExample(exampleField);
 
     return `
-// Example: Scoring with custom metadata
+// Example: Scoring with custom zone metadata
 function calculateScore(context: TypedScoringContext): number {
   let totalScore = 0;
   
   for (const tile of context.getAllTiles()) {
-    const metadata = tile.card?.customMetadata;
+    const metadata = tile.customMetadata;
     if (metadata) {
       ${exampleUsage}
     }

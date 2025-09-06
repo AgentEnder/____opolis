@@ -13,6 +13,10 @@ export interface CustomMetadataField {
   min?: number; // For number type
   max?: number; // For number type
   required?: boolean;
+  // Rendering configuration
+  renderOnCard?: boolean; // Whether to render this field on cards
+  renderFormula?: string; // TypeScript code for rendering
+  compiledRenderFormula?: string; // Compiled JavaScript for rendering
 }
 
 export interface CustomMetadata {

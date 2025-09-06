@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useDeckEditorStore } from '../../stores/deckEditorStore';
 import { CellType, CellData } from '../../types/game';
+import { ZoneMetadataForm } from './ZoneMetadataForm';
 
 interface ZoneEditorProps {
   isOverlay?: boolean;
@@ -200,6 +201,35 @@ export default function ZoneEditor({ isOverlay = false }: ZoneEditorProps) {
               This zone has {editingCard.cells[selectedZone.row][selectedZone.col].roads.length} road segment{editingCard.cells[selectedZone.row][selectedZone.col].roads.length !== 1 ? 's' : ''}
             </div>
           )}
+          
+          {/* Zone Metadata */}
+          {currentDeck?.metadataSchema && (
+            <div className="border-t border-blue-200 pt-3">
+              <ZoneMetadataForm
+                zoneData={editingCard.cells[selectedZone.row][selectedZone.col]}
+                cardIndex={-1} // We'll handle saving differently in card builder
+                zoneRow={selectedZone.row}
+                zoneCol={selectedZone.col}
+                metadataSchema={currentDeck.metadataSchema}
+                onMetadataChange={(metadata) => {
+                  // Update the editing card directly instead of using the store
+                  const updatedCells = editingCard.cells.map((cellRow, rowIndex) =>
+                    cellRow.map((cell, colIndex) => {
+                      if (rowIndex === selectedZone.row && colIndex === selectedZone.col) {
+                        return { ...cell, customMetadata: metadata };
+                      }
+                      return cell;
+                    })
+                  );
+                  
+                  setEditingCard({
+                    ...editingCard,
+                    cells: updatedCells,
+                  });
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -211,6 +241,7 @@ export default function ZoneEditor({ isOverlay = false }: ZoneEditorProps) {
           <li>• Use preset buttons for common zone types</li>
           <li>• Create custom zones with the text input</li>
           <li>• Switch to Road tool to add connections</li>
+          {currentDeck?.metadataSchema && <li>• Edit zone metadata in the metadata section below</li>}
         </ul>
       </div>
     </div>

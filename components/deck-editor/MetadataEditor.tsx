@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { useMetadataStore } from '../../stores/metadataStore';
-import { useDeckEditorStore } from '../../stores/deckEditorStore';
-import { CustomMetadataField } from '../../types/metadataSystem';
-import { CardMetadataForm } from './CardMetadataForm';
+import { useEffect, useState } from "react";
+import { useMetadataStore } from "../../stores/metadataStore";
+import { useDeckEditorStore } from "../../stores/deckEditorStore";
+import { CustomMetadataField } from "../../types/metadataSystem";
+import { MetadataFieldModal } from "../metadata/MetadataFieldModal";
 
 export function MetadataEditor() {
   const { currentDeck, updateMetadataSchema } = useDeckEditorStore();
@@ -18,20 +18,24 @@ export function MetadataEditor() {
     generateFieldId,
   } = useMetadataStore();
 
-  const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
-  const [newFieldData, setNewFieldData] = useState<Partial<CustomMetadataField>>({
-    name: '',
-    type: 'text',
-    description: '',
-    required: false,
-  });
+  const [fieldModalOpen, setFieldModalOpen] = useState(false);
+  const [editingField, setEditingField] = useState<CustomMetadataField | null>(null);
 
   // Initialize schema from deck when component mounts
-  useState(() => {
+  useEffect(() => {
+    console.log("MetadataEditor: Checking if we need to initialize schema", {
+      hasCurrentDeckSchema: !!currentDeck?.metadataSchema,
+      hasCurrentSchema: !!currentSchema,
+      currentDeckName: currentDeck?.name,
+    });
     if (currentDeck?.metadataSchema && !currentSchema) {
+      console.log(
+        "MetadataEditor: Initializing schema from deck",
+        currentDeck.metadataSchema
+      );
       setSchema(currentDeck.metadataSchema);
     }
-  });
+  }, [currentDeck?.metadataSchema, currentSchema, setSchema]);
 
   if (!currentDeck) {
     return (
@@ -46,35 +50,48 @@ export function MetadataEditor() {
   }
 
   const handleSaveSchema = () => {
+    console.log("MetadataEditor: handleSaveSchema called", {
+      hasCurrentSchema: !!currentSchema,
+      validationErrorsCount: validationErrors.length,
+      currentSchema,
+    });
     if (currentSchema && validationErrors.length === 0) {
+      console.log("MetadataEditor: Saving schema to deck", currentSchema);
       updateMetadataSchema(currentSchema);
       setEditingSchema(false);
+      console.log("MetadataEditor: Schema saved successfully");
+    } else {
+      console.log(
+        "MetadataEditor: Cannot save - validation errors or no schema"
+      );
     }
   };
 
-  const handleAddField = () => {
-    if (!newFieldData.name) return;
+  const handleOpenNewFieldModal = () => {
+    setEditingField(null);
+    setFieldModalOpen(true);
+  };
 
-    const fieldId = generateFieldId(newFieldData.name);
-    const field: CustomMetadataField = {
-      id: fieldId,
-      name: newFieldData.name,
-      type: newFieldData.type || 'text',
-      description: newFieldData.description,
-      required: newFieldData.required || false,
-      ...(newFieldData.type === 'select' && { options: ['Option 1', 'Option 2'] }),
-      ...(newFieldData.type === 'number' && { min: 0, max: 100 }),
-    };
+  const handleOpenEditFieldModal = (field: CustomMetadataField) => {
+    setEditingField(field);
+    setFieldModalOpen(true);
+  };
 
-    addField(field);
-    
-    // Reset form
-    setNewFieldData({
-      name: '',
-      type: 'text',
-      description: '',
-      required: false,
-    });
+  const handleSaveField = (field: CustomMetadataField) => {
+    if (editingField) {
+      // Editing existing field
+      updateField(field.id, field);
+    } else {
+      // Creating new field
+      addField(field);
+    }
+    setFieldModalOpen(false);
+    setEditingField(null);
+  };
+
+  const handleCloseFieldModal = () => {
+    setFieldModalOpen(false);
+    setEditingField(null);
   };
 
   const metadataFields = currentSchema?.fields || [];
@@ -85,7 +102,10 @@ export function MetadataEditor() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Custom Metadata</h2>
-          <p className="text-gray-600">Define custom properties for cards in {currentDeck.name}</p>
+          <p className="text-gray-600">
+            Define custom metadata schema for {currentDeck.name}. Metadata will
+            be applied at the zone level.
+          </p>
         </div>
         <div className="flex space-x-2">
           {isEditingSchema && (
@@ -130,170 +150,142 @@ export function MetadataEditor() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Schema Definition */}
-        <div className="space-y-6">
-          <div className="card bg-base-100 shadow-sm">
-            <div className="card-body">
-              <h3 className="text-lg font-semibold mb-4">Metadata Schema</h3>
-              
-              {metadataFields.length === 0 ? (
-                <div className="text-center py-6">
-                  <div className="text-gray-500 mb-2">No custom fields defined</div>
-                  <p className="text-sm text-gray-400">Add custom fields to enable card-specific metadata</p>
+      {/* Schema Definition */}
+      <div className="space-y-6">
+        <div className="card bg-base-100 shadow-sm">
+          <div className="card-body">
+            <h3 className="text-lg font-semibold mb-4">Metadata Schema</h3>
+
+            {metadataFields.length === 0 ? (
+              <div className="text-center py-6">
+                <div className="text-gray-500 mb-2">
+                  No custom fields defined
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {metadataFields.map((field) => (
-                    <div key={field.id} className="border rounded-lg p-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <h4 className="font-medium">{field.name}</h4>
-                            <span className="badge badge-sm">{field.type}</span>
-                            {field.required && <span className="badge badge-error badge-xs">Required</span>}
-                          </div>
-                          {field.description && (
-                            <p className="text-sm text-gray-600 mt-1">{field.description}</p>
+                <p className="text-sm text-gray-400">
+                  Add custom fields to enable card-specific metadata
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {metadataFields.map((field) => (
+                  <div key={field.id} className="border rounded-lg p-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-medium">{field.name}</h4>
+                          <span className="badge badge-sm">{field.type}</span>
+                          {field.required && (
+                            <span className="badge badge-error badge-xs">
+                              Required
+                            </span>
                           )}
-                          <div className="text-xs text-gray-400 mt-1">ID: {field.id}</div>
+                          {field.renderOnCard && (
+                            <span className="badge badge-success badge-xs">
+                              Renders on Card
+                            </span>
+                          )}
                         </div>
-                        {isEditingSchema && (
+                        {field.description && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            {field.description}
+                          </p>
+                        )}
+                        <div className="text-xs text-gray-400 mt-1">
+                          ID: {field.id}
+                        </div>
+                      </div>
+                      {isEditingSchema && (
+                        <div className="flex space-x-1">
                           <button
-                            className="btn btn-ghost btn-xs text-error"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleOpenEditFieldModal(field)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm text-error"
                             onClick={() => removeField(field.id)}
                           >
-                            🗑️
+                            Delete
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Add Field Form */}
-              {isEditingSchema && (
-                <div className="mt-6 border-t pt-6">
-                  <h4 className="font-medium mb-3">Add New Field</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="label">
-                        <span className="label-text">Field Name</span>
-                      </label>
-                      <input
-                        type="text"
-                        className="input input-bordered w-full"
-                        value={newFieldData.name || ''}
-                        onChange={(e) => setNewFieldData({ ...newFieldData, name: e.target.value })}
-                        placeholder="e.g., Livestock Count"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="label">
-                        <span className="label-text">Field Type</span>
-                      </label>
-                      <select
-                        className="select select-bordered w-full"
-                        value={newFieldData.type || 'text'}
-                        onChange={(e) => setNewFieldData({ ...newFieldData, type: e.target.value as any })}
-                      >
-                        <option value="text">Text</option>
-                        <option value="number">Number</option>
-                        <option value="boolean">Boolean (True/False)</option>
-                        <option value="select">Select (Options)</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="label">
-                        <span className="label-text">Description (Optional)</span>
-                      </label>
-                      <textarea
-                        className="textarea textarea-bordered w-full"
-                        value={newFieldData.description || ''}
-                        onChange={(e) => setNewFieldData({ ...newFieldData, description: e.target.value })}
-                        placeholder="Describe what this field represents"
-                        rows={2}
-                      />
-                    </div>
-                    
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text">Required field</span>
-                        <input
-                          type="checkbox"
-                          className="checkbox"
-                          checked={newFieldData.required || false}
-                          onChange={(e) => setNewFieldData({ ...newFieldData, required: e.target.checked })}
-                        />
-                      </label>
-                    </div>
-                    
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={handleAddField}
-                      disabled={!newFieldData.name}
-                    >
-                      Add Field
-                    </button>
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+                ))}
+              </div>
+            )}
 
-        {/* Card Metadata Editor */}
-        <div className="space-y-6">
-          <div className="card bg-base-100 shadow-sm">
-            <div className="card-body">
-              <h3 className="text-lg font-semibold mb-4">Card Metadata</h3>
-              
-              {metadataFields.length === 0 ? (
-                <div className="text-center py-6">
-                  <div className="text-gray-500 mb-2">No metadata schema defined</div>
-                  <p className="text-sm text-gray-400">Define metadata fields first to edit card properties</p>
-                </div>
-              ) : currentDeck.baseCards.length === 0 ? (
-                <div className="text-center py-6">
-                  <div className="text-gray-500 mb-2">No cards in deck</div>
-                  <p className="text-sm text-gray-400">Create cards to add custom metadata</p>
-                </div>
-              ) : (
-                <>
-                  <div className="mb-4">
-                    <label className="label">
-                      <span className="label-text">Select Card to Edit</span>
-                    </label>
-                    <select
-                      className="select select-bordered w-full"
-                      value={selectedCardIndex ?? ''}
-                      onChange={(e) => setSelectedCardIndex(e.target.value ? parseInt(e.target.value) : null)}
-                    >
-                      <option value="">Choose a card...</option>
-                      {currentDeck.baseCards.map((card, index) => (
-                        <option key={card.id} value={index}>
-                          {card.name || `Card ${card.id.slice(-4)}`} (x{card.count})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {selectedCardIndex !== null && (
-                    <CardMetadataForm
-                      card={currentDeck.baseCards[selectedCardIndex]}
-                      cardIndex={selectedCardIndex}
-                      metadataSchema={currentSchema}
-                    />
-                  )}
-                </>
-              )}
-            </div>
+            {/* Add Field Button */}
+            {isEditingSchema && (
+              <div className="mt-6 border-t pt-6">
+                <button
+                  className="btn btn-primary w-full"
+                  onClick={handleOpenNewFieldModal}
+                >
+                  + Add New Field
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Zone Type Defaults Section */}
+      <div className="mt-8">
+        <div className="card bg-base-100 shadow-sm">
+          <div className="card-body">
+            <h3 className="text-lg font-semibold mb-4">Zone Type Defaults</h3>
+
+            {metadataFields.length === 0 ? (
+              <div className="text-center py-6">
+                <div className="text-gray-500 mb-2">
+                  No metadata schema defined
+                </div>
+                <p className="text-sm text-gray-400">
+                  Define metadata fields first to set zone type defaults
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-sm text-gray-600 mb-4">
+                  Set default metadata values for each zone type. These will be
+                  applied when creating new zones.
+                </div>
+                {currentDeck.zoneTypes.map((zoneType) => (
+                  <div key={zoneType.id} className="border rounded-lg p-4">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div
+                        className="w-6 h-6 rounded-full border-2"
+                        style={{ backgroundColor: zoneType.color }}
+                      />
+                      <div>
+                        <h4 className="font-medium">{zoneType.name}</h4>
+                        <p className="text-sm text-gray-500">
+                          {zoneType.description}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      Zone type metadata defaults would be configured here in
+                      individual zone components.
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Field Editor Modal */}
+      <MetadataFieldModal
+        isOpen={fieldModalOpen}
+        field={editingField}
+        onSave={handleSaveField}
+        onClose={handleCloseFieldModal}
+        generateFieldId={generateFieldId}
+      />
     </div>
   );
 }
