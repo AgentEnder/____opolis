@@ -10,6 +10,7 @@ import { RuleTestEnvironment } from "./RuleTestEnvironment";
 import { MetadataEditor } from "./MetadataEditor";
 import { RuleTestMachineProvider } from "../../providers/RuleTestMachineProvider";
 import { CustomDeck } from "../../types/deck";
+import { withBaseUrl } from "../../utils/baseUrl";
 
 interface DeckEditorProps {
   deckId?: string;
@@ -138,7 +139,7 @@ export default function DeckEditor({ deckId }: DeckEditorProps) {
 
       if (createdDeck) {
         // Update the URL to reflect the new deck ID without page refresh
-        const newUrl = `/deck-editor/${newDeckId}`;
+        const newUrl = withBaseUrl(`/deck-editor/${newDeckId}`);
         window.history.replaceState({}, "", newUrl);
 
         // Update the current deck state
@@ -159,7 +160,7 @@ export default function DeckEditor({ deckId }: DeckEditorProps) {
     }
 
     // Navigate back to game setup
-    window.location.href = "/";
+    window.location.href = withBaseUrl("/");
   };
 
   if (!currentDeck) {

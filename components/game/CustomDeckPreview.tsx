@@ -1,6 +1,7 @@
 import React from 'react';
 import { CustomDeck } from '../../types/deck';
 import CardPreview from '../CardPreview';
+import { withBaseUrl } from '../../utils/baseUrl';
 
 interface CustomDeckPreviewProps {
   deck: CustomDeck;
@@ -195,7 +196,7 @@ export default function CustomDeckPreview({
             Add to Game
           </button>
           <button
-            onClick={() => window.location.href = `/deck-editor?deckId=${deck.id}`}
+            onClick={() => window.location.href = withBaseUrl(`/deck-editor?deckId=${deck.id}`)}
             className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300"
           >
             View Full Deck

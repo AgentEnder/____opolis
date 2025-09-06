@@ -5,6 +5,7 @@ import { useUIStore } from '../stores/uiStore';
 import { useCustomDecksStore } from '../stores/customDecksStore';
 import CustomDeckSelector from './deck-management/CustomDeckSelector';
 import CustomDeckPreview from './game/CustomDeckPreview';
+import { withBaseUrl } from '../utils/baseUrl';
 
 interface GameSetupProps {
   onExit: () => void;
@@ -181,13 +182,13 @@ export default function GameSetup({ onExit }: GameSetupProps) {
             <label className="block text-lg font-semibold">Custom Decks</label>
             <div className="flex gap-2">
               <button
-                onClick={() => window.location.href = '/deck-editor'}
+                onClick={() => window.location.href = withBaseUrl('/deck-editor')}
                 className="text-sm text-green-600 hover:text-green-800 font-semibold"
               >
                 Deck Editor
               </button>
               <button
-                onClick={() => window.location.href = '/deck-management'}
+                onClick={() => window.location.href = withBaseUrl('/deck-management')}
                 className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
               >
                 Manage Decks
@@ -198,7 +199,7 @@ export default function GameSetup({ onExit }: GameSetupProps) {
           <CustomDeckSelector
             selectedDecks={selectedCustomDecks}
             onToggleDeck={toggleCustomDeck}
-            onCreateDeck={() => window.location.href = '/deck-management'}
+            onCreateDeck={() => window.location.href = withBaseUrl('/deck-management')}
             onPreviewDeck={(deck) => setPreviewDeck(deck)}
           />
         </div>

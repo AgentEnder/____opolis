@@ -4,6 +4,7 @@ import { CustomDeck } from '../../types/deck';
 import { useCustomDecksStore } from '../../stores/customDecksStore';
 import { validateCustomDeck, getCardDistributionSummary } from '../../utils/deckValidation';
 import { useUIStore } from '../../stores/uiStore';
+import { withBaseUrl } from '../../utils/baseUrl';
 
 interface CustomDeckSelectorProps {
   selectedDecks: CustomDeck[];
@@ -261,7 +262,7 @@ export default function CustomDeckSelector({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.location.href = `/deck-editor/${showActions}`;
+                  window.location.href = withBaseUrl(`/deck-editor/${showActions}`);
                 }}
                 className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-base-200 rounded-btn"
               >

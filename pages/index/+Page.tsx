@@ -1,3 +1,5 @@
+import { withBaseUrl } from '../../utils/baseUrl';
+
 export default Page;
 
 function Page() {
@@ -12,7 +14,7 @@ function Page() {
         Each game offers unique challenges and endless replayability in a compact format.
       </p>
       <div className="mt-8">
-        <a href="/play" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">
+        <a href={withBaseUrl("/play")} className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">
           Start Playing
         </a>
       </div>
