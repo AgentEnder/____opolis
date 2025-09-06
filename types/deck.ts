@@ -1,7 +1,7 @@
-import { Card, CellData, CellType, RoadSegment } from './game';
-import { ScoringCondition } from './scoring';
-import { CustomScoringCondition } from './scoring-formulas';
-import { CustomMetadata, MetadataSchema } from './metadataSystem';
+import { Card, CellData, CellType, RoadSegment } from "./game";
+import { ScoringCondition } from "./scoring";
+import { CustomScoringCondition } from "./scoring-formulas";
+import { CustomMetadata, MetadataSchema } from "./metadataSystem";
 
 export interface ZoneType {
   id: string;
@@ -38,15 +38,15 @@ export interface GameVariation {
     primaryColor: string;
     secondaryColor: string;
   };
-  type?: 'preset' | 'custom';
+  type?: "preset" | "custom";
   isCustom?: boolean;
+  metadataSchema?: MetadataSchema; // Schema for custom card metadata
 }
 
 export interface CustomDeck extends GameVariation {
-  type: 'custom';
+  type: "custom";
   isCustom: true;
   customScoringConditions: CustomScoringCondition[]; // All custom scoring conditions in this deck
-  metadataSchema?: MetadataSchema; // Schema for custom card metadata
   metadata: {
     author: string;
     created: Date;
@@ -56,7 +56,10 @@ export interface CustomDeck extends GameVariation {
 }
 
 // Helper function to create cell data
-const cell = (type: CellType, roads: RoadSegment[] = []): CellData => ({ type, roads });
+const cell = (type: CellType, roads: RoadSegment[] = []): CellData => ({
+  type,
+  roads,
+});
 
 // Common road patterns
 const ROADS = {
@@ -72,261 +75,325 @@ const ROADS = {
 
 // Sprawopolis (Urban sprawl theme)
 export const SPRAWOPOLIS: GameVariation = {
-  id: 'sprawopolis',
-  name: 'Sprawopolis',
-  description: 'The original urban planning card game',
-  type: 'preset',
+  id: "sprawopolis",
+  name: "Sprawopolis",
+  description: "The original urban planning card game",
+  type: "preset",
   isCustom: false,
   zoneTypes: [
-    { id: 'residential', name: 'Residential', color: '#60a5fa', description: 'Housing areas' },
-    { id: 'commercial', name: 'Commercial', color: '#f59e0b', description: 'Business districts' },
-    { id: 'industrial', name: 'Industrial', color: '#6b7280', description: 'Manufacturing zones' },
-    { id: 'park', name: 'Park', color: '#34d399', description: 'Green spaces' },
+    {
+      id: "residential",
+      name: "Residential",
+      color: "#60a5fa",
+      description: "Housing areas",
+    },
+    {
+      id: "commercial",
+      name: "Commercial",
+      color: "#f59e0b",
+      description: "Business districts",
+    },
+    {
+      id: "industrial",
+      name: "Industrial",
+      color: "#6b7280",
+      description: "Manufacturing zones",
+    },
+    { id: "park", name: "Park", color: "#34d399", description: "Green spaces" },
   ],
   theme: {
-    primaryColor: '#3b82f6',
-    secondaryColor: '#1e40af'
+    primaryColor: "#3b82f6",
+    secondaryColor: "#1e40af",
   },
   baseCards: [
     // Residential-heavy cards
     {
-      id: 'spr-001',
-      name: 'Residential Block',
+      id: "spr-001",
+      name: "Residential Block",
       count: 3,
       cells: [
-        [cell('residential'), cell('residential')],
-        [cell('residential'), cell('park')]
+        [cell("residential"), cell("residential")],
+        [cell("residential"), cell("park")],
       ],
-      scoringConditionId: 'spr-001-residential-block'
+      scoringConditionId: "spr-001-residential-block",
     },
     {
-      id: 'spr-002', 
-      name: 'Suburb',
+      id: "spr-002",
+      name: "Suburb",
       count: 2,
       cells: [
-        [cell('residential', ROADS.HORIZONTAL), cell('residential', ROADS.HORIZONTAL)],
-        [cell('park'), cell('residential')]
+        [
+          cell("residential", ROADS.HORIZONTAL),
+          cell("residential", ROADS.HORIZONTAL),
+        ],
+        [cell("park"), cell("residential")],
       ],
-      scoringConditionId: 'spr-002-suburb'
+      scoringConditionId: "spr-002-suburb",
     },
     // Commercial districts
     {
-      id: 'spr-003',
-      name: 'Shopping District',
+      id: "spr-003",
+      name: "Shopping District",
       count: 2,
       cells: [
-        [cell('commercial'), cell('commercial')],
-        [cell('commercial'), cell('residential')]
+        [cell("commercial"), cell("commercial")],
+        [cell("commercial"), cell("residential")],
       ],
-      scoringConditionId: 'spr-003-shopping-district'
+      scoringConditionId: "spr-003-shopping-district",
     },
     {
-      id: 'spr-004',
-      name: 'Main Street',
+      id: "spr-004",
+      name: "Main Street",
       count: 3,
       cells: [
-        [cell('commercial', ROADS.VERTICAL), cell('park')],
-        [cell('commercial', ROADS.VERTICAL), cell('commercial')]
+        [cell("commercial", ROADS.VERTICAL), cell("park")],
+        [cell("commercial", ROADS.VERTICAL), cell("commercial")],
       ],
-      scoringConditionId: 'spr-004-main-street'
+      scoringConditionId: "spr-004-main-street",
     },
     // Industrial areas
     {
-      id: 'spr-005',
-      name: 'Factory District',
+      id: "spr-005",
+      name: "Factory District",
       count: 2,
       cells: [
-        [cell('industrial'), cell('industrial')],
-        [cell('industrial'), cell('park')]
+        [cell("industrial"), cell("industrial")],
+        [cell("industrial"), cell("park")],
       ],
-      scoringConditionId: 'spr-005-factory-district'
+      scoringConditionId: "spr-005-factory-district",
     },
     {
-      id: 'spr-006',
-      name: 'Warehouse',
+      id: "spr-006",
+      name: "Warehouse",
       count: 2,
       cells: [
-        [cell('industrial', ROADS.L_TOP_RIGHT), cell('commercial')],
-        [cell('park'), cell('industrial')]
+        [cell("industrial", ROADS.L_TOP_RIGHT), cell("commercial")],
+        [cell("park"), cell("industrial")],
       ],
-      scoringConditionId: 'spr-006-warehouse'
+      scoringConditionId: "spr-006-warehouse",
     },
     // Mixed development
     {
-      id: 'spr-007',
-      name: 'Mixed Use',
+      id: "spr-007",
+      name: "Mixed Use",
       count: 4,
       cells: [
-        [cell('commercial'), cell('residential')],
-        [cell('park'), cell('industrial')]
+        [cell("commercial"), cell("residential")],
+        [cell("park"), cell("industrial")],
       ],
-      scoringConditionId: 'spr-007-mixed-use'
+      scoringConditionId: "spr-007-mixed-use",
     },
     // Road-heavy cards
     {
-      id: 'spr-008',
-      name: 'Intersection',
+      id: "spr-008",
+      name: "Intersection",
       count: 3,
       cells: [
-        [cell('park', ROADS.L_LEFT_TOP), cell('commercial', ROADS.L_TOP_RIGHT)],
-        [cell('residential', ROADS.L_BOTTOM_LEFT), cell('industrial', ROADS.L_RIGHT_BOTTOM)]
+        [cell("park", ROADS.L_LEFT_TOP), cell("commercial", ROADS.L_TOP_RIGHT)],
+        [
+          cell("residential", ROADS.L_BOTTOM_LEFT),
+          cell("industrial", ROADS.L_RIGHT_BOTTOM),
+        ],
       ],
-      scoringConditionId: 'spr-008-intersection'
-    }
+      scoringConditionId: "spr-008-intersection",
+    },
   ],
   expansions: [
     {
-      id: 'spr-exp-1',
-      name: 'Sprawopolis: Beaches',
-      description: 'Adds coastal development cards',
+      id: "spr-exp-1",
+      name: "Sprawopolis: Beaches",
+      description: "Adds coastal development cards",
       cards: [
         {
-          id: 'spr-beach-001',
-          name: 'Beachfront',
+          id: "spr-beach-001",
+          name: "Beachfront",
           count: 2,
           cells: [
-            [cell('park'), cell('park')],
-            [cell('residential'), cell('commercial')]
+            [cell("park"), cell("park")],
+            [cell("residential"), cell("commercial")],
           ],
-          scoringConditionId: 'spr-beach-001-beachfront'
+          scoringConditionId: "spr-beach-001-beachfront",
         },
         {
-          id: 'spr-beach-002',
-          name: 'Pier',
+          id: "spr-beach-002",
+          name: "Pier",
           count: 1,
           cells: [
-            [cell('commercial', ROADS.HORIZONTAL), cell('commercial', ROADS.HORIZONTAL)],
-            [cell('park'), cell('park')]
+            [
+              cell("commercial", ROADS.HORIZONTAL),
+              cell("commercial", ROADS.HORIZONTAL),
+            ],
+            [cell("park"), cell("park")],
           ],
-          scoringConditionId: 'spr-beach-002-pier'
-        }
-      ]
-    }
-  ]
+          scoringConditionId: "spr-beach-002-pier",
+        },
+      ],
+    },
+  ],
 };
 
 // Agropolis (Rural/farming theme)
 const AGROPOLIS: GameVariation = {
-  id: 'agropolis',
-  name: 'Agropolis',
-  description: 'Rural farming and countryside development',
-  type: 'preset',
+  id: "agropolis",
+  name: "Agropolis",
+  description: "Rural farming and countryside development",
+  type: "preset",
   isCustom: false,
   zoneTypes: [
-    { id: 'fields', name: 'Fields', color: '#84cc16', description: 'Farmland and crops' },
-    { id: 'livestock', name: 'Livestock', color: '#a78bfa', description: 'Animal farming' },
-    { id: 'orchards', name: 'Orchards', color: '#34d399', description: 'Fruit trees' },
-    { id: 'buildings', name: 'Buildings', color: '#f59e0b', description: 'Farm buildings' },
+    {
+      id: "fields",
+      name: "Fields",
+      color: "#84cc16",
+      description: "Farmland and crops",
+    },
+    {
+      id: "livestock",
+      name: "Livestock",
+      color: "#a78bfa",
+      description: "Animal farming",
+    },
+    {
+      id: "orchards",
+      name: "Orchards",
+      color: "#34d399",
+      description: "Fruit trees",
+    },
+    {
+      id: "buildings",
+      name: "Buildings",
+      color: "#f59e0b",
+      description: "Farm buildings",
+    },
   ],
   theme: {
-    primaryColor: '#22c55e',
-    secondaryColor: '#15803d'
+    primaryColor: "#22c55e",
+    secondaryColor: "#15803d",
   },
   baseCards: [
     {
-      id: 'agr-001',
-      name: 'Farmland',
+      id: "agr-001",
+      name: "Farmland",
       count: 4,
       cells: [
-        [cell('park'), cell('park')],
-        [cell('park'), cell('residential')]
+        [cell("park"), cell("park")],
+        [cell("park"), cell("residential")],
       ],
-      scoringConditionId: 'agr-001-farmland'
+      scoringConditionId: "agr-001-farmland",
     },
     {
-      id: 'agr-002',
-      name: 'Barn Complex',
+      id: "agr-002",
+      name: "Barn Complex",
       count: 3,
       cells: [
-        [cell('industrial'), cell('park')],
-        [cell('park'), cell('park')]
+        [cell("industrial"), cell("park")],
+        [cell("park"), cell("park")],
       ],
-      scoringConditionId: 'agr-002-barn-complex'
+      scoringConditionId: "agr-002-barn-complex",
     },
     {
-      id: 'agr-003',
-      name: 'Country Store',
+      id: "agr-003",
+      name: "Country Store",
       count: 2,
       cells: [
-        [cell('commercial', ROADS.L_TOP_RIGHT), cell('residential')],
-        [cell('park'), cell('park')]
+        [cell("commercial", ROADS.L_TOP_RIGHT), cell("residential")],
+        [cell("park"), cell("park")],
       ],
-      scoringConditionId: 'agr-003-country-store'
+      scoringConditionId: "agr-003-country-store",
     },
     {
-      id: 'agr-004',
-      name: 'Rural Road',
+      id: "agr-004",
+      name: "Rural Road",
       count: 4,
       cells: [
-        [cell('park', ROADS.HORIZONTAL), cell('park', ROADS.HORIZONTAL)],
-        [cell('residential'), cell('park')]
+        [cell("park", ROADS.HORIZONTAL), cell("park", ROADS.HORIZONTAL)],
+        [cell("residential"), cell("park")],
       ],
-      scoringConditionId: 'agr-004-rural-road'
-    }
+      scoringConditionId: "agr-004-rural-road",
+    },
   ],
-  expansions: []
+  expansions: [],
 };
 
 // Casinopolis (Casino/entertainment theme)
 const CASINOPOLIS: GameVariation = {
-  id: 'casinopolis', 
-  name: 'Casinopolis',
-  description: 'Glitzy casino and entertainment district',
-  type: 'preset',
+  id: "casinopolis",
+  name: "Casinopolis",
+  description: "Glitzy casino and entertainment district",
+  type: "preset",
   isCustom: false,
   zoneTypes: [
-    { id: 'casino', name: 'Casino', color: '#dc2626', description: 'Gaming floors' },
-    { id: 'hotel', name: 'Hotel', color: '#7c3aed', description: 'Accommodation' },
-    { id: 'entertainment', name: 'Entertainment', color: '#06b6d4', description: 'Shows and venues' },
-    { id: 'dining', name: 'Dining', color: '#f59e0b', description: 'Restaurants and bars' },
+    {
+      id: "casino",
+      name: "Casino",
+      color: "#dc2626",
+      description: "Gaming floors",
+    },
+    {
+      id: "hotel",
+      name: "Hotel",
+      color: "#7c3aed",
+      description: "Accommodation",
+    },
+    {
+      id: "entertainment",
+      name: "Entertainment",
+      color: "#06b6d4",
+      description: "Shows and venues",
+    },
+    {
+      id: "dining",
+      name: "Dining",
+      color: "#f59e0b",
+      description: "Restaurants and bars",
+    },
   ],
   theme: {
-    primaryColor: '#f59e0b',
-    secondaryColor: '#d97706'
+    primaryColor: "#f59e0b",
+    secondaryColor: "#d97706",
   },
   baseCards: [
     {
-      id: 'cas-001',
-      name: 'Casino Floor',
+      id: "cas-001",
+      name: "Casino Floor",
       count: 3,
       cells: [
-        [cell('commercial'), cell('commercial')],
-        [cell('commercial'), cell('commercial')]
-      ]
+        [cell("commercial"), cell("commercial")],
+        [cell("commercial"), cell("commercial")],
+      ],
     },
     {
-      id: 'cas-002',
-      name: 'Hotel Tower',
+      id: "cas-002",
+      name: "Hotel Tower",
       count: 2,
       cells: [
-        [cell('residential'), cell('residential')],
-        [cell('commercial'), cell('park')]
-      ]
+        [cell("residential"), cell("residential")],
+        [cell("commercial"), cell("park")],
+      ],
     },
     {
-      id: 'cas-003',
-      name: 'Entertainment District',
+      id: "cas-003",
+      name: "Entertainment District",
       count: 3,
       cells: [
-        [cell('commercial', ROADS.VERTICAL), cell('park')],
-        [cell('commercial', ROADS.VERTICAL), cell('residential')]
-      ]
+        [cell("commercial", ROADS.VERTICAL), cell("park")],
+        [cell("commercial", ROADS.VERTICAL), cell("residential")],
+      ],
     },
     {
-      id: 'cas-004',
-      name: 'Service Area',
+      id: "cas-004",
+      name: "Service Area",
       count: 2,
       cells: [
-        [cell('industrial'), cell('commercial')],
-        [cell('park'), cell('residential')]
-      ]
-    }
+        [cell("industrial"), cell("commercial")],
+        [cell("park"), cell("residential")],
+      ],
+    },
   ],
-  expansions: []
+  expansions: [],
 };
 
 export const GAME_VARIATIONS: GameVariation[] = [
   SPRAWOPOLIS,
-  AGROPOLIS, 
-  CASINOPOLIS
+  AGROPOLIS,
+  CASINOPOLIS,
 ];

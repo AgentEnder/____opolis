@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:stately.ai)"
+      "WebFetch(domain:stately.ai)",
+      "WebFetch(domain:daisyui.com)",
+      "WebFetch(domain:vite.dev)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []
