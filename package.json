@@ -38,7 +38,11 @@
       "deploy": {
         "executor": "nx-github-pages:deploy",
         "options": {
-          "directory": "dist/client"
+          "directory": "dist/client",
+          "user": {
+            "name": "Github Actions",
+            "email": "github-actions@users.noreply.github.com"
+          }
         },
         "dependsOn": [
           "build"

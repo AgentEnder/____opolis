@@ -13,4 +13,5 @@ export default defineConfig({
   build: {
     target: "es2022",
   },
+  base: process.env.CI ? "/____opolis/" : "/",
 });

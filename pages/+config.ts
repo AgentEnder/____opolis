@@ -13,5 +13,8 @@ export default {
   title: "My Vike App",
   description: "Demo showcasing Vike",
 
+  ssr: true,
+  prerender: true,
+
   extends: vikeReact,
 } satisfies Config;

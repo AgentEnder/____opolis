@@ -27,5 +27,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Setup Git User
+        run: |
+          git config --global user.name "${GITHUB_ACTOR}"
+          git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+
       - name: Deploy
         run: pnpm nx deploy blank-opolis --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
